@@ -48,6 +48,7 @@ Depends:
 Imports:
     AMModels,
     aws.s3,
+    birdnetR,
     caret,
     data.table,
     DBI,

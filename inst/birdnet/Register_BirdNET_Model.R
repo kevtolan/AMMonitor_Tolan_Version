@@ -25,7 +25,7 @@ if (nrow(existing) > 0) {
     model_url = "https://birdnet-team.github.io/birdnetR/",
     amml = NA_character_,
     model_type = "CNN",
-    model_description = "BirdNET v2.4 bird sound classifier, run via the birdnetR R package. Detections are restricted to the species in birdnet_species_list.csv (see birdSpeciesList.R).",
+    model_description = "BirdNET v2.4 bird sound classifier, run via the birdnetR R package (see birdsDetect()). Detections are restricted to whichever species list you pass as speciesListPath.",
     model_citation = "Kahl, S., Wood, C. M., Eibl, M., & Klinck, H. (2021). BirdNET: A deep learning solution for avian diversity monitoring. Ecological Informatics, 61, 101236. https://doi.org/10.1016/j.ecoinf.2021.101236",
     fk_taxonid = NA_character_,
     fk_librarylistid = NA_character_,

@@ -8,12 +8,14 @@ suppressPackageStartupMessages(library(ritis))
 suppressPackageStartupMessages(library(AMMonitor))
 suppressPackageStartupMessages(library(birdnetR))
 
-source("~/R/AMMonitor_VPMon/birdSpeciesList.R")
+# birdSpeciesList(), birdsDetect(), etc. ship as real exported functions in
+# AMMonitor -- no source() needed as long as the package is loaded above.
+species_list_path <- '~/R/AMMonitor_VPMon/birdnet_species_list.csv'
 
 db.path <- '~/R/AMMonitor_VPMon/VPMon_AMM/database/VPMon_AMM.sqlite'
 conx <- RSQLite::dbConnect(drv = dbDriver('SQLite'), dbname = db.path)
 
-common_names <- birdSpeciesList()
+common_names <- birdSpeciesList(species_list_path)
 
 # BirdNET labels are "Scientific name_Common name" -- use this to get the
 # correct scientific name for each species in the working list.
