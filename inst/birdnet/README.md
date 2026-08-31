@@ -4,18 +4,24 @@ Adds BirdNET (via the [birdnetR](https://birdnet-team.github.io/birdnetR/)
 package) as a detection model, replacing the old Python + CSV-import
 workflow.
 
-`birdsDetect()`, `birdSpeciesList()`, `birdSpeciesAdd()`, and
-`birdSpeciesRemove()` are real exported AMMonitor functions -- `library(AMMonitor)`
-is all you need, no `source()` required. See `?birdsDetect` and
-`?birdSpeciesList`.
+`birdsDetect()`, `birdSpeciesList()`, `birdSpeciesAdd()`, `birdSpeciesRemove()`,
+`registerBirdNETModel()`, and `registerBirdNETSpecies()` are all real exported
+AMMonitor functions -- `library(AMMonitor)` is all you need, no `source()`
+required. See `?birdsDetect`, `?birdSpeciesList`, `?registerBirdNETModel`, and
+`?registerBirdNETSpecies`.
 
-The two scripts in this folder are one-time setup, not package functions --
-source them manually, same as you'd run `import_birdnet.R` once:
+One-time setup, safe to re-run (skips anything already registered):
 
 ```r
-source(system.file("birdnet/Register_BirdNET_Model.R", package = "AMMonitor"))   # registers BirdNET_v2.4 in the models table
-source(system.file("birdnet/Register_BirdNET_Species.R", package = "AMMonitor")) # registers your species list as taxa (via ritis/ITIS TSN lookup)
+registerBirdNETModel(conx)                                              # registers BirdNET_v2.4 in the models table
+registerBirdNETSpecies(conx, speciesListPath = "birdnet_species_list.csv") # registers your species list as taxa (via ritis/ITIS TSN lookup)
 ```
+
+Both take `con` as an explicit argument, same as every other AMMonitor
+function -- point them at whichever database connection you have open. No
+database path is hardcoded anywhere in these functions, so it's safe to run
+against a trial/scratch database without risk of silently touching a
+different one.
 
 ## Getting your own species list
 
