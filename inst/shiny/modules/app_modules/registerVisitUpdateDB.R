@@ -236,7 +236,7 @@ registerVisitUpdateDB_server <- function(id, mediaType, visitMetadata, screenDat
           media_type = mediaType(),
           start_date = media_dates,
           start_time = media_times,
-          filepath = paste(dirDest(), newFileNames, sep = '/')
+          filepath = paste(sub("/+$", "", dirDest()), newFileNames, sep = '/')
         )
         newMedia["filename"] <- newFileNames
 
