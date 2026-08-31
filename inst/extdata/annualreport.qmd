@@ -1,0 +1,139 @@
+---
+title: "Annual Report"
+format: 
+  html:
+    self-contained: true
+editor: visual
+params:
+  dbPath: "path-to-database"
+  startDate: "2023-01-01"
+  endDate: "2023-12-31"
+  author: "Gandalf"
+---
+
+## Middle Earth Annual Report
+
+```{r, results = "hide", fig.keep = "none"}
+#| echo: FALSE
+#| message: FALSE
+#| warning: FALSE
+
+# load required packages
+library(AMMonitor)
+  
+dbPath <- params$dbPath
+startDate <- params$startDate
+endDate <- params$endDate
+author <- params$author
+
+# connect to the database
+conx <-  AMMonitor::dbSetCon(dbPath)
+
+# run dbGetSummary
+results <- AMMonitor::dbGetSummaryData(
+ con = conx,
+ m_dates = c(startDate, endDate),
+ disconnect = TRUE
+)
+
+tableresults <- AMMonitor::dbTableSummary(summary_data = results)
+
+plotresults <- AMMonitor::dbPlotSummary(
+  summary_data = results,
+  map_database = 'state',
+  regions = 'vermont')
+
+```
+
+This annual report documents wildlife monitoring activities in Middle Earth from `r startDate` to `r endDate`. The figures and tables were generated from the `dbGetSummaryData()`, `dbPlotSummary()`, and `dbTableSummary()` functions from the R package, *AMMonitor.* The report was generated from a Quarto script.
+
+## Field Visits
+
+Autonomous monitoring units were deployed at `r nrow(results$locations)` in Middle Earth, where devices captured wildlife on trail cameras and audio recorders (Figure 1).
+
+```{r, eval = TRUE, echo = FALSE}
+
+plotresults$gg_locations_map + 
+  ggplot2::labs(
+    title = "",
+    caption = paste0(
+      'Figure 1: Map of Locations for Middle Earth Wildlife Study \nbetween ',
+      startDate, ' and ', endDate)) +
+  ggplot2::theme(
+    plot.caption = ggplot2::element_text(
+      hjust = 0, 
+      size = 12))
+```
+
+Field technicians made a total of `r nrow(results$media_visits)` visits to monitoring stations to collect media files (Table 1).
+
+```{r }
+#| cap-location: top
+#| echo: FALSE
+tableresults$media_visits_year_location |>
+  gt::tab_options(
+    container.width = 500,
+    table.align = 'center'
+  ) |>
+  gt::tab_caption(caption = 'Table 1.')
+
+```
+
+## Media Files
+
+At the monitoring locations, a total of `r nrow(results$media)` files were captured in the report time period (Table 2).
+
+```{r}
+#| echo: FALSE
+
+tableresults$media_count_year_type |>
+  gt::tab_options(
+    container.width = 500,
+    table.align = 'center'
+  ) |>
+  gt::tab_caption(caption = 'Table 2')
+
+```
+
+## Annotations
+
+Media files (camera images and audio files) were labeled by both hobbits and machine learning models. Hobbit labeling was done with the *AMMonitor* shiny interface, in which a hobbit manually inspected media files and identified monitoring targets within. Annotations per tagger for all taxa are shown in Figure 2.
+
+```{r}
+#| echo: FALSE
+#| eval: TRUE
+
+plotresults$gg_annotations_personid_keysp + 
+  ggplot2::labs(title = "",
+                caption = 'Figure 2: Annotations per person for all taxa.') +
+  ggplot2::theme(plot.caption = ggplot2::element_text(
+    hjust = 0,
+    size = 12)
+  )
+
+```
+
+## Machine Learning Detections
+
+The media collected by monitoring units were also labeled by machine learning models. For the Middle Earth monitoring program, `r length(unique(results$modelverifications$fk_modelid))` machine models are used. A total of `r nrow(results$modeloutputs)` model outputs were returned on media from within the report time period (Table 3).
+
+```{r}
+#| echo: FALSE
+tableresults$modeloutputs_year |>
+  gt::tab_options(
+    container.width = 500,
+    table.align = 'center'
+  ) |>
+  gt::tab_caption(caption = 'Table 3.')
+```
+
+## Summary
+
+In summary, it was a great year for the Middle Earth wildlife monitoring program. Our focus for the next year will be building species distribution models from the hobbit- and machine-tagged data.
+
+Respectfully submitted,
+
+```{r}
+#| echo: FALSE
+message(params$author)
+```

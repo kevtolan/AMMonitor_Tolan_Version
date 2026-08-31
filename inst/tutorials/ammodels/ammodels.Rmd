@@ -1,0 +1,292 @@
+---
+title: "AMMonitor 17:  AMModels"
+tutorial:
+  id: "ammodels"
+  version: 1.0
+output: learnr::tutorial
+css: www/style.css
+csl: www/methods-in-ecology-and-evolution.csl
+runtime: shiny_prerendered
+description: "Introduces the *AMModels* package for storing ML models." 
+bibliography: www/ammodels.bib
+---
+
+```{r setup, include=FALSE}
+source('includes.R')
+shiny::addResourcePath("figs", system.file("extdata/figs", package = "AMMonitor"))
+```
+
+## ![](figs/ammonitor-hex.png){width=100px} AMModels
+
+The *AMMonitor* SQLite database does much of the heavy lifting for managing *AMMonitor* data by tracking people, equipment, metadata about recordings and photos, and more. To store and manage models, however, we use the R package, *AMModels* [@AMModels]. The abstract of the paper describing this package reads:
+
+> &#128073;&#127995; Agencies are increasingly called upon to implement their natural resource management programs within an adaptive management (AM) framework. This article provides the background and motivation for the R package, *AMModels.* . . . The overall goal of *AMModels* is simple: To codify knowledge in the form of models and to store it, along with models generated from numerous analyses and datasets that may come our way, so that it can be used or recalled in the future. *AMModels* facilitates this process by storing all models and datasets in a single object that can be saved to an .RDS file and routinely augmented to track changes in knowledge through time. . .  Many R packages exist for creating and summarizing models, but to our knowledge, *AMModels* is the only package dedicated not to the mechanics of analysis but to organizing analysis inputs, analysis outputs, and preserving descriptive metadata. 
+
+The full paper can be found here (with apologies for the long introduction):
+
+```{r ammodels, exercise = TRUE}
+browseURL("https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0188966")
+```
+
+
+Generally speaking, a “model” is typically the result of some analysis. An *AMModels* “library” stores a collection of models as a single R object (the “model library”) that can be saved to an .RDS file, thus allowing models to be retrieved for future use. Models may be used for a variety of purposes: (a) to generate predictions, (b) to serve as a prior model to be updated with Bayesian methods as new data are collected, (c) to assess the system state with respect to management objectives, and (d) to predict responses to management activities. Models stored in an *AMModels* library retain their original R class, can be associated with metadata, and can be easily saved and retrieved when needed.
+
+In the context of *AMMonitor*, models are used in a variety of ways. For example, we may have a model library that stores templates created with the monitoR package [@monitoR], we may have a model library that stores occupancy models, and another model library that stores classifiers that separate template true positives from false positives [@balantic].  
+
+
+
+> &#128073;&#127996; For running template analyses, *AMMonitor* will ask for the filepath to the AMModels library that stores templates.  Thus, while you aren't required to store your libraries in the "ammls" directory, you are required to store templates in a library somewhere!
+
+## The demo library
+
+As with all other tutorials, we used the `ammCreateMiniDemo()` function to create a small demo project named "demoAMM" that is pulled into the tutorial itself, with the file path stored as the R object, "demo_fp". This filepath is stored on your machine and can be found by running the following code:
+
+```{r demofp}
+demo_fp
+```
+
+Once again, let's remind ourselves of the directories within an *AMMonitor* project:
+
+```{r demoproject, exercise = TRUE}
+list.files(demo_fp, recursive = FALSE)
+```
+
+Here, we're looking for a directory named "ammls", which is where your model libraries should be stored.  Each model library is an RDS file that can be called into R.
+
+For example, the demo contains a model library that stores templates, which are models of a target audio signal that is of interest to a monitoring program.  For example, the Middle Earth team may be interested in monitoring Ovenbirds and Black-throated Green Warblers.  Let's confirm the existence of a demo library:
+
+
+```{r}
+# look at the sample ammodels library that stores templates in the amml directory
+list.files(file.path(demo_fp, "ammls"), recursive = FALSE)
+```
+
+We can make the model library available by reading it into R with the `readRDS()` function.  Here, we captured the library as an object named "templates".
+
+```{r}
+# read in the "templates" model library; note there are 4 templates
+templates <- readRDS(file.path(demo_fp, "ammls", "templates.RDS"))
+
+# look at the class
+class(templates)
+
+# show a summary of the library
+AMModels::summary(templates)
+```
+
+The `AMModels::summary()` function will show what's in a given library. Look for the main headings "Description", "Info", "Model Names".  It is also possible to store datasets in a model library, but this particular library does not contain any.
+
+## Library slots
+
+A single *AMModel* library is an S4 R object with 4 slots, which can be verified with the `slotNames` function.
+
+
+```{r}
+slotNames(templates)
+```
+
+
+Each slot is described in the next few sections. The package *AMModels* contains functions to create the **amModelLib** object, functions to create objects of class **amModel** and **amData**, and methods to insert, extract, and delete items from the **amModelLib** object. 
+
+
+## The description slot
+
+The description slot contains a text field that describes the **amModelLib.** Generally the description is one sentence long, and can be retrieved or updated with the `ammlDesc()` function.
+
+```{r}
+AMModels::ammlDesc(amml = templates)
+```
+
+Let's update the description:
+
+
+```{r updatedesc, exercise = TRUE}
+# update the description
+AMModels::ammlDesc(amml = templates) <- "This library stores templates of Ovenbirds and Black-throated Green Warblers."
+
+# show the description
+AMModels::ammlDesc(amml = templates)
+```
+
+Additional information can be added in the "info" slot, described next.
+
+## The info slot
+
+The "info" slot contains a named list with additional information about the **amModelLib**, such as the name of the person who creates and maintains the **amModelLib**, and any additional related metadata pertaining to the library itself.  The `ammlInfo()` function can be used to both retrieve and update the information.
+
+
+```{r}
+AMModels::ammlInfo(amml = templates)
+```
+
+You can see a named list is returned, where the names are the "keys" and the values are variables that describe the library itself, such as owner = gandalf. 
+
+Deletions can be done by setting the value associated with a key to NULL, and elements can be added or updated
+
+```{r}
+# delete the date.created element
+AMModels::ammlInfo(amml = templates) <- list(date.created = NULL)
+
+# add an organization
+AMModels::ammlInfo(amml = templates) <- list(
+  organization = "Middle Earth Conservancy"
+)
+
+# show the updated info slot
+AMModels::ammlInfo(amml = templates)
+```
+
+
+## The data slot
+
+The data slot of an **amModelLib** object contains a list of datasets (analysis inputs), where each dataset is stored as an object of class **amData.** The purpose of this class is to allow the user to store datasets that may be linked with models.  
+
+The key functions associated with amData objects include:
+
+- `amData()` —creates an object of class **amData.**
+- `insertAMModelLib()` —inserts objects of class **amData** to an **amModelLib** object.
+- `rmData()` —deletes an **amData** object from an **amModelLib** object.
+- `getAMData() ` —extracts ("checks out") an **amData** object from the **amModelLib** object and returns it to R's global environment.
+
+The sample library does not contain datasets, so we'll move onto the models slot (which mirrors the data slot).
+
+## The models slot
+
+This slot stores models, i.e., analysis outputs. Each model has a class of amModel, which consists of two slots: 1) models are stored in the model slot, and 2) metadata about the model are stored in the metadata slot.
+
+Models (analysis outputs) are stored in the model slot of the amModelLib object, and the model slot is a list of objects of class amModel. As with the amData class detailed above, the purpose of this class is to store not only the analysis outputs, but also metadata about the outputs. 
+
+- `amModel` — creates an object of class **amModel.**
+- `insertAMModelLib` — inserts objects of class **amModel** to a **amModelLib** object.
+- `rmModel` — deletes an **amModel** object.
+- `getAMModel` — extracts an **amModel** object from the **amModelLib** object and returns it to the global environment in its original form.
+
+> &#128073;&#127997; AMMonitor's Shiny interface can be used to create models, such as templates. The "create_templates" app will guide you through the steps of creating a template, and behind the scenes makes called to `amModel()` and `insertAMModelLib()`.
+
+The quickest way to get a listing of the models within the model library is to use the `lsModels` function, which retrieves the names of the **amModel** objects in an **amModelLib**:
+
+```{r}
+# list the amModel objects within the library
+
+AMModels::lsModels(templates)
+```
+
+Though it might not be readily apparent, these models are correlation templates (_ct) and binary point matching templates(_bt) for Ovenbird (oven) and Black-throated Green Warbler (btnw).  We introduced templates in the "models" tutorial.
+
+
+The `modelMeta` function allows metadata to be viewed or set after the model has been inserted into the **amModelLib** object. For example, let's see if the Ovenbird correlation template has any metadata associated with it.
+
+```{r}
+AMModels::modelMeta(amml = templates, "oven_ct")
+```
+
+Like the "info" slot, a model's metadata is entered as key-value pairs, stored as a named list. It's helpful to be verbose here; you can even include details on the methods for creating the model, for later use in a report.
+
+To retrieve a model from the library, the `getAMModel()` function is used. This pulls the **amModel** object out of the library, making it available for use; this does not remove the model from the library.  The optional argument, as.list indicates how the object is to be returned: FALSE (default) will return the model in its original class, while TRUE will return a list containing the model in its original class and the metadata.
+
+
+```{r, eval = T}
+# retrieve oven_ct; this does not remove the model from the library
+extracted.ovenct <- AMModels::getAMModel("oven_ct", amml = templates, as.list = FALSE)
+
+extracted.ovenct
+```
+
+Here, hopefully you can see this model is of class "corTemplateList", created with the *monitoR* package [@monitoR]. It is a list of one template, with the actual template saved as class 'corTemplate', which is an S4 object.  Let's look at the structure of this object so you can see the various elements.
+
+```{r}
+str(extracted.ovenct)
+```
+
+Here, you can see that objects of class 'corTemplate' are s4 objects with slot names such as "clip.path", "samp.rate", "pts", "t.step", "frq.lim", "wl", "ovlp", and "score.cutoff", among others.  Many of these could be added as metadata associated with this *amModel* object, such that you can extract this information from the library without pulling the model into R.
+
+<p class=instructions>
+Try it!
+</p>
+
+```{r addmeta, exercise = TRUE}
+
+```
+
+```{r addmeta-hint}
+AMModels::modelMeta(amml = templates, "oven_ct") <- list(
+  clip.path = "oven.wav",
+  samp.rate = 24000,
+  duration = 2.97
+)
+
+AMModels::modelMeta(amml = templates, "oven_ct")
+```
+
+
+To remove a specific **amModel** object from the **amModelLib**, use `rmModel()` function. 
+
+## Searching and saving a model library
+
+Users may create as many **amModelLibs** as needed to help organize a variety of models. As the number of models and datasets grows within an **amModelLib** object, it may be useful to search for objects within it and subset the **amModelLib** object if necessary. The function, **grepAMModelLib** can be used for this purpose; it returns an object of class **amModelLib** containing the matches to the search (if any).
+
+The function uses grep to recursively search for a pattern in a given **amModelLib** object; the pattern argument may therefore be a simple string or a regular expression. The user may search both the model and data slots ('all'), or either the model or the data slot by specifying a search argument; omitting the search argument will default to 'all'.
+
+Here, we will search for "oven" in the models section of the library, and capture the result as an object named "oven_templates".  
+
+```{r, eval = T}
+oven_templates <- AMModels::grepAMModelLib(
+  pattern = "oven", 
+  amml = templates, 
+  search = "model")
+
+# show the new model library
+oven_templates
+```
+
+Of course, now there are two libraries that contain Ovenbird templates, so due diligence is needed to keep your libraries well maintained.
+
+
+> &#128073;&#127998; When you are finished working with a library, make sure to save it again to an RDS file if any changes were made.
+
+```{r, eval = F}
+saveRDS(templates, file = "templates.RDS")
+```
+
+
+As we've indicated, users may maintain multiple **amModelLibs** to best meets their needs. For example, a single **amModelLib** may be used to:
+
+- Store models associated with a specific set of analyses, such as those included in an annual report, a scientific paper, or a monitoring program;
+- Store models associated with a specific species or research project (e.g., the Ovenbird library);
+- Store models by model type (all occupancy models);
+- Store all models by a particular person;
+- Etc.
+
+Trial and error may reveal the best approach to meet the user's needs. At some point, a library may become quite large and cumbersome, and we hope the tools provided in this package allow users to reorganize **amModelLib** objects as needs change.
+
+## AMModels in AMMonitor
+
+A few *AMMonitor* "apps" make use of an *AMModels* library. As we've seen, audio templates are stored in the *AMModels* library.  Other types of models (classification models) should be stored in an AMModels library (ideally one dedicated to that class of models).  
+
+You can see AMModels libraries in action in the "create_templates" app and the "create_classifiers" app in the Shiny "Apps" menu.  Recall that an "app" is a guided, step-by-step analysis that walks a user through a particular task, such as creating a template.
+
+Please see the "models" *learnr* tutorial to see this in action.
+
+
+## Tutorial summary 
+
+This chapter was a brief introduction to the *AMModels* package.  
+A list of other *AMMonitor* tutorials is provided below.
+  
+```{r , eval = T}
+learnr::available_tutorials("AMMonitor")
+```
+
+
+> &#128073;&#127997; A final FYI:  If you'd like a pdf of this document, use the browser "print" function (right-click, print) to print to pdf.  If you want to include quiz questions and R exercises, make sure to provide answers to them before printing.
+
+## References
+
+
+
+
+
+
+
+
+

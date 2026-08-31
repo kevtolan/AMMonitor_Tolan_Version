@@ -1,0 +1,361 @@
+---
+title: "AMMonitor 19:  ScienceBase"
+tutorial:
+  id: "sciencebase"
+  version: 1.0
+output: learnr::tutorial
+css: www/style.css
+csl: www/methods-in-ecology-and-evolution.csl
+runtime: shiny_prerendered
+description: "See how to release AMMonitor projects on USGS ScienceBase, and how to re-create a new AMMonitor project from a published release." 
+bibliography: www/sciencebase.bib
+---
+
+```{r setup, include=FALSE}
+source('includes.R')
+shiny::addResourcePath("figs", system.file("extdata/figs", package = "AMMonitor"))
+```
+
+## ![](figs/ammonitor-hex.png){width=100px} ScienceBase
+
+
+The package *AMMonitor* was developed by U.S. Geological Survey scientists (USGS), and consequently we strongly encourage the practice of releasing datasets (i.e., an *AMMonitor* project) to the public domain. 
+
+> &#128073;&#127998; Publication of scientific data as standalone products or in conjunction with the scholarly articles they support is integral to the open data movement. The USGS has developed a path for formally releasing or publishing USGS scientific data called a "data release."  -- https://www.usgs.gov/data-management/data-release
+
+*AMMonitor* releases are hosted in the USGS ScienceBase repository, a trusted digital repository providing access to scientific data products and resources.  Let's look at this repository now: 
+
+```{r sciencebase, exercise = TRUE}
+browseURL("https://www.sciencebase.gov/catalog/")
+```
+
+Within this repository, an *AMMonitor* community has been established, where data releases can be found by research group.  Let's look at this community page now:
+
+```{r, sbamm, exercise = TRUE}
+browseURL("https://www.sciencebase.gov/catalog/item/6188c0c4d34ec04fc9c4f7a4")
+```
+
+Within the community, each monitoring partner has their own landing page. For example, the "Middle Earth Wildlife Study" partner's page is at:
+
+```{r, mesb, exercise = TRUE}
+browseURL("https://www.sciencebase.gov/catalog/item/62b9b787d34e8f4977cc9e77")
+```
+
+Monitoring partners can release their *AMMonitor* datasets in "volumes", which are the formal USGS data release product, complete with a DOI (digital object identifier). Volumes can contain an entire *AMMonitor* project, or can be subsets of an *AMMonitor* project (e.g., data can be released by year, with each year's data released as a separate volume). 
+
+For example, Middle Earth's Volume 1 release (Gamgee et al. 2024) is at:  
+
+```{r, mev1, exercise = TRUE}
+browseURL("https://www.sciencebase.gov/catalog/item/654a576bd34ee4b6e05c24d6")
+```
+
+Have a good look at this page, as it contains the data and media files that make up an *AMMonitor* project.  (Many of the csv file names should look very familiar by now!)
+
+> &#128073;&#127995; Before we go further, we'd like to fully acknowledge the contributions of Drew Ignizio and Madison Langseth from the USGS Science Analytics & Synthesis (SAS) program in setting up the *AMMonitor* community and release process in ScienceBase.
+
+To host data on ScienceBase, the USGS requires 7 elements to release data: 1) Data management plan, 2) data, 3) FGDC-compliant metadata, 4) DOI, 5) data & metadata review, 6) acceptable data repository, and 7) metadata available through the USGS Science Data Catalog.  See https://www.usgs.gov/data-management/data-release for additional information. 
+
+
+The primary benefit of releasing data is that they are now in the public domain and adhere to the FAIR principle of data management.
+
+> &#128073;&#127996;FAIR data are data which meet principles of findability, accessibility, interoperability, and reusability (FAIR). The acronym and principles were defined in a March 2016 paper in the journal Scientific Data by a consortium of scientists and organizations.  Source: https://en.wikipedia.org/wiki/FAIR_data
+
+The elements of the FAIR Principle are described at https://www.go-fair.org/fair-principles/:
+
+### Findable
+
+The first step in (re)using data is to find them. Metadata and data should be easy to find for both humans and computers. Machine-readable metadata are essential for automatic discovery of datasets and services, so this is an essential component of the FAIRification process.
+
+F1. (Meta)data are assigned a globally unique and persistent identifier
+
+F2. Data are described with rich metadata (defined by R1 below)
+
+F3. Metadata clearly and explicitly include the identifier of the data they describe
+
+F4. (Meta)data are registered or indexed in a searchable resource
+
+### Accessible
+
+Once the user finds the required data, she/he/they need to know how they can be accessed, possibly including authentication and authorisation.
+
+A1. (Meta)data are retrievable by their identifier using a standardised communications protocol
+
+A1.1 The protocol is open, free, and universally implementable
+
+A1.2 The protocol allows for an authentication and authorisation procedure, where necessary
+
+A2. Metadata are accessible, even when the data are no longer available
+
+### Interoperable
+
+The data usually need to be integrated with other data. In addition, the data need to interoperate with applications or workflows for analysis, storage, and processing.
+
+I1. (Meta)data use a formal, accessible, shared, and broadly applicable language for knowledge representation.
+
+I2. (Meta)data use vocabularies that follow FAIR principles
+
+I3. (Meta)data include qualified references to other (meta)data
+
+### Reusable
+
+The ultimate goal of FAIR is to optimise the reuse of data. To achieve this, metadata and data should be well-described so that they can be replicated and/or combined in different settings.
+
+R1. (Meta)data are richly described with a plurality of accurate and relevant attributes
+
+R1.1. (Meta)data are released with a clear and accessible data usage license
+
+R1.2. (Meta)data are associated with detailed provenance
+
+R1.3. (Meta)data meet domain-relevant community standards
+
+
+> &#128073;&#127997; In a nutshell, any *AMMonitor* releases that are displayed within the *AMMonitor* community have met these stringent standards.  If you'd like to join the AMMonitor ScienceBase community, please reach out to a USGS *AMMonitor* contact.
+
+## Rehydrating a release
+
+To make *AMMonitor* data releases reusable, we can "rehydrate" them into a new *AMMonitor* project. "Rehydrating" a released *AMMonitor* project means to create a new *AMMonitor* project, including the database and media files, on your machine, from a data release on ScienceBase. 
+
+Before explaining how to "rehydrate" an AMMonitor project from ScienceBase, let us first explain a bit about how data are organized within ScienceBase. Data in ScienceBase are contained within "items", each of which shares the same core structure, with common metadata fields such as an ID (ScienceBase item number), title, summary, dates, and file attachments. You can read about the item core model [here](https://www.usgs.gov/sciencebase-instructions-and-documentation/item-core-model). ScienceBase items can also have parent/child relationships with each other, allowing one to easily link items. AMMonitor uses the sbtools [@sbtools] R package to interact with data in ScienceBase, and we'll use that package in this tutorial as well. 
+
+To "rehydrate" a released *AMMonitor* project, use the `sbRehydrate()` function. Let's look at the help page first. 
+
+```{r sbreh, exercise = TRUE}
+help("sbRehydrate", package = "AMMonitor")
+```
+
+The `sbRehydrate()` function returns the filepath of the rehydrated *AMMonitor* project, where you can use it for your own purposes.
+
+Next, we'll rehydrate the data release titled "Gamgee, S. S., Baggins, B. B., and Baggins. F. F., 2024, Middle Earth Wildlife Study Volume 1 (2023 - 2023): U.S. Geological Survey data release, https://doi.org/xxxxxx/XXXXXX."   We've seen the release page already; it is ScienceBase item 654a576bd34ee4b6e05c24d6. To rehydrate this project, we simply need to identify the name the new *AMMonitor* project (e.g., "MiddleEarth"), identify the parent directory that will house the new project (ammPath = `getwd()`), and point to the ScienceBase item number (sbItemNum = "654a576bd34ee4b6e05c24d6").
+
+Let's see the `sbRehydrate()` function in action.
+
+<p class=instructions>
+Open a new session of R by going to Session | New Session (so that two instances of R are running on your machine). Then, run the following commands in the new session's console, which uses `sbRehydrate()` to create the rehydrated *AMMonitor* project and `launchApp()` to launch the app.  
+</p>
+
+```{r, eval = FALSE}
+# load AMMonitor
+library(AMMonitor)
+
+project_fp <- sbRehydrate(
+ ammPath = tempdir(), 
+ sbItemNum = "654a576bd34ee4b6e05c24d6",
+ projectName = "MiddleEarth")
+
+# look at the the filepath of the rehydrated project 
+project_fp
+
+# look at the folders within an AMMonitor project
+list.files(project_fp, recursive = FALSE)
+
+# look in the database folder
+list.files(file.path(project_fp, "database"), recursive = FALSE)
+
+# look in the media folders 
+list.files(file.path(project_fp, "photos"), recursive = FALSE)
+list.files(file.path(project_fp, "recordings"), recursive = FALSE)
+```
+
+As you hopefully see after running the above code, a new AMMonitor project, with its full directory structure, is created at the path specified by **project_fp**. The "database" directory of the new AMMonitor project contains a database file, "MiddleEarth.sqlite", but both the "photos" and "recordings" folders are empty. So, where are the media files?
+
+> &#128073;&#127995; Rehydrating an *AMMonitor* database from ScienceBase will NOT download the associated media files. This can be done seperately, as desired.
+
+We made a conscious decision to separate the process of rehydrating the database from downloading media files because (1) the end-user may only be interested in the project's metadata (such as in the case where all data are fully labeled and the original media files are not needed for further analyses) and (2) the raw media files may be quite large (hundreds of gigabytes, or more). We leave it to you (the user) to download media files as desired. But the question remains, where are the media files? To find out, let's take a look at the "child" items of our ScienceBase release using the *sbtools* package:
+
+``` {r}
+sb_children <- sbtools::item_list_children('654a576bd34ee4b6e05c24d6')
+str(sb_children, max.level = 2)
+```
+
+As you can hopefully see, there are two "child" items associated with our data release, titled "Photo files for Middle Earth Wildlife Study Volume 1" and "Audio files for Middle Earth Wildlife Study Volume 1", each of which contains media files as attachments. It may be helpful to know the space requirements of a media download in advance, since these can be quite large! The size of each attachment is contained in the object **sb_children** but is somewhat buried within the object, so we'll provide some R code that uses the native pipe operator `|>` to get the total size of all attachments:
+
+```{r}
+# Total size of all attachments
+total_attachment_size <- sb_children |> 
+  lapply(function(sb_child) {sb_child[['files']]}) |> # Extract files from items
+  unlist(recursive = FALSE) |>  # Collapse the lists of files into one list
+  sapply(function(item_file) {item_file$size}) |> # Extract size from files
+  unlist() |> # Convert from a list to a vector before summing
+  sum() |> # Add together all the sizes (in bytes)
+  structure(class="object_size") |> # Format the result with class "object_size"
+  format(units="auto") # Auto-convert the size units
+
+print(total_attachment_size)
+```
+
+Running this code should show that the demo project has about 10 Mb worth of media files on ScienceBase. These files can be downloaded directly from ScienceBase's website, but you can also try using *sbtools* to download these data programmatically. Here is some code to download and unzip the media files, depositing them in the AMMonitor project's media folders. Try running this code after rehydrating the project:
+
+``` {r, eval = FALSE}
+# Get "child" items of the release volume (these contain the media files)
+sb_children <- sbtools::item_list_children('654a576bd34ee4b6e05c24d6')
+
+# Download and unzip files associated with each child item
+for (sb_child in sb_children) {
+  #Download all attachments to a temporary directory
+  zip_files <- sbtools::item_file_download(
+    sb_id = sb_child$id, 
+    dest_dir = tempdir()
+  )
+  
+  # Get the proper media folder, based on media type
+  media_folder <- ifelse(
+    grepl("Photo", sb_child$title),
+    "photos",
+    "recordings"
+  )
+  
+  # Unzip each of the downloaded files into the proper media folder
+  for (zip_file in zip_files) {
+    utils::unzip(
+      zipfile = zip_file,
+      exdir = file.path(project_fp, media_folder)
+    )
+    unlink(zip_file) # Remove the downloaded file after unzipping
+    unlink(file.path(project_fp, media_folder, "readme.txt")) # Remove the readme file
+  }
+}
+
+# look in the media folders 
+list.files(file.path(project_fp, "photos"), recursive = FALSE)
+list.files(file.path(project_fp, "recordings"), recursive = FALSE)
+```
+
+Hopefully now we can see the project's media folders are populated with the raw media files. With the database rehydrated and the media files downloaded, you can launch the *AMMonitor* Shiny app and use the database at will:
+
+```{r, eval = FALSE}
+# launch the Shiny application
+launchApp(project_fp)
+```
+
+## Ongoing projects
+
+While each data release is a standalone product, many PI's may release their data incrementally, even while the greater project is ongoing.
+
+In that case, portions of the master database have been released to ScienceBase, but the master database itself does not store release information, nor does it identify which media files are associated with the release.  
+
+Assuming a release is a subset of a master database, the function `sbInsertMetadata()` can be used to accomplish these tasks.  To illustrate `sbInsertMetadata()`, as with all other tutorials, we use the `ammCreateMiniDemo()` function to create a small demo project named "demoAMM" that is pulled into the tutorial itself, with the file path stored as the R object, "demo_fp". This filepath is stored on your machine and can be found by running the following code:
+
+```{r demofp}
+demo_fp
+```
+
+Let's look at the demo project now, noting that the demo database is already present in the demo project, as shown below:
+```{r}
+list.files(file.path(demo_fp, "database"))
+```
+
+We'll assume this is the "master database" and that Middle Earth is continuing the monitoring program well into the future. And we'll assume that they released all their data into "Volume 1", as previously described.
+
+Let's look at the master database *sciencebase* table:
+
+```{r}
+DBI::dbReadTable(conx, name = "sciencebase")
+```
+
+As you can see, it's empty.  But this table can store virtually all of the metadata pertinent to the data release. Let's look at the tables column names:
+
+```{r}
+DBI::dbListFields(conx, name = "sciencebase")
+```
+
+Yowsa!  That's a very large table with 87 columns and 0 rows.  This table is intended to store information associated with each release.  The primary key is **pk_sciencebaseid**, which is an auto-number.  Look for the columns **sb_project_item** and **sb_volume_item**, which are the ScienceBase identifiers we described previously.
+
+
+Now let's look at the *media* table:
+
+```{r}
+DBI::dbReadTable(conx, name = "media")
+```
+
+Look for the column named **fk_sciencebaseid**, and note that the media files are NOT associated with any given release.
+
+
+> &#128073;&#127998;  Middle Earth needs to update their master database with the release information, as well as associate the media files with the release. This is accomplished with the `sbInsertMetadata()` function.
+
+The `sbInsertMetadata()` function requires an open connection to the master database (**con**), the **sbItemNumber** associated with the release, and the filepath to the release metadata XML file (**xmlPath**).  The last argument, **disconnect**, indicates whether the database connection should be severed after the function call is complete (the default is FALSE).
+
+```{r}
+args(sbInsertMetadata)
+```
+
+You'll need to download the XML file associated with the release onto your machine. This metadata file can be downloaded from release's "Attached Files" [via the web](https://www.sciencebase.gov/catalog/item/654a576bd34ee4b6e05c24d6), or programmatically using the *sbtools* R package. We'll download the XML file with *sbtools* here, and we'll capture its filepath as an object, "fp":  
+
+```{r}
+# Download XML metadata from ScienceBase
+fp <- sbtools::item_file_download(
+  sb_id = "654a576bd34ee4b6e05c24d6",
+  names = "Middle Earth Wildlife Study Volume 1 (2023 - 2023).xml",
+  destinations = file.path(tempdir(), "sb_metadata.xml")
+)
+
+# confirm the file exists
+file.exists(fp)
+```
+
+Now, let's run the `sbInsertMetaData()` function to update the master database so that it includes the release information:
+
+```{r insertex, exercise = TRUE}
+sbInsertMetadata(
+  con = conx,
+  sbItemNum = "654a576bd34ee4b6e05c24d6",
+  xmlPath = fp,
+  fromRehydrate = FALSE,
+  disconnect = FALSE
+)
+```
+
+Now, let's reinspect the *sciencebase* table, and note that the full release information has been stored there with **pk_sciencebase** = 1.
+
+
+```{r readsb, exercise = TRUE}
+DBI::dbReadTable(conx, name = "sciencebase")
+```
+
+
+Next, let's confirm the media files associated with this release,  noting the **fk_sciencebaseid** column has been filled in, linking media files with their release number.
+
+```{r readmedia, exercise = TRUE}
+DBI::dbReadTable(conx, name = "media")
+```
+
+In short, the `sbInsertMetadata()` function is a workhorse function for monitoring programs that release their data incrementally to track past data releases to ScienceBase in their database. 
+
+## Tutorial summary 
+
+We've introduced the USGS ScienceBase repository in this tutorial, and introduced ways of rehydrating an *AMMonitor* release from scratch. We also introduced ways of updating a master database for projects that release date incrementally. 
+
+The last step in this tutorial is to disconnect from the database, and then delete the demo database to free up space on your machine.   
+
+```{r, eval = FALSE}
+# disconnect from database
+DBI::dbDisconnect(conx)
+```
+
+```{r, eval = T}
+# delete the demo database
+unlink(demo_fp)
+```
+
+Next up?  Let's look at the list of available tutorials in AMMonitor, where you can choose your next adventure.
+
+```{r , eval = T}
+learnr::available_tutorials(package = "AMMonitor")
+```
+
+> &#128073;&#127997; A final FYI:  If you'd like a pdf of this document, use the browser "print" function (right-click, print) to print to pdf.  If you want to include quiz questions and R exercises, make sure to provide answers to them before printing.
+
+
+
+## References
+
+Balantic, C., and T. Donovan.  2020. “AMMonitor: Remote Monitoring of Biodiversity in an Adaptive Framework with R.” Methods in Ecology and Evolution 11: 869–77. https://doi.org/10.1111/2041-210X.13397.
+
+Gamgee, S. S., Baggins, B. B., and Baggins. F. F., 2024, Middle Earth Wildlife Study Volume 1 (2023 - 2023): U.S. Geological Survey data release, https://doi.org/xxxxxx/XXXXXX.
+
+
+
+
+
+
+
+

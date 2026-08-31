@@ -1,0 +1,20 @@
+bibentry(
+
+  "Article",
+
+  title = "{AMMonitor}: AMMonitor: Remote monitoring of biodiversity in an adaptive framework with R",
+
+  author = "Balantic C, Donovan T.",
+
+  year = 2020,
+
+  journal = "Methods Ecol Evol.",
+
+  volume = 11,
+
+  pages = 869,
+
+  doi = "10.1111/2041-210X.13397"
+
+)
+

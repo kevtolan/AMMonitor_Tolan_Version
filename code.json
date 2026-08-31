@@ -1,0 +1,53 @@
+[
+  {
+    "name": "AMMonitor",
+    "organization": "U.S. Geological Survey",
+    "description": "Remote monitoring of biodiversity in an adaptive framework",
+    "version": "2.2.0",
+    "status": "Production",
+
+    "permissions": {
+      "usageType": "openSource",
+      "licenses": [
+        {
+          "name": "Public Domain, CC0-1.0",
+          "URL": "https://code.usgs.gov/vtcfwru/ammonitor/-/raw/2.2.0/LICENSE.md"
+        }
+      ]
+    },
+
+    "homepageURL": "https://code.usgs.gov/vtcfwru/AMMonitor",
+    "downloadURL": "https://code.usgs.gov/vtcfwru/ammonitor/-/archive/2.2.0/ammonitor-2.2.0.zip",
+    "disclaimerURL": "https://code.usgs.gov/vtcfwru/ammonitor/-/raw/2.2.0/DISCLAIMER.md",
+    "repositoryURL": "https://code.usgs.gov/vtcfwru/ammonitor.git",
+    "vcs": "git",
+
+    "laborHours": 0,
+
+    "tags": [
+      "ARU",
+      "wildlife",
+      "acoustic monitoring",
+      "camera monitoring",
+      "occupancy",
+      "usg-artificial-intelligence",
+      "USGS", 
+      "SQLite",
+      "machine learning"
+    ],
+
+    "languages": [
+      "R"
+    ],
+
+    "contact": {
+      "name": "Therese Donovan",
+      "email": "tdonovan@usgs.gov"
+    },
+
+    "date": {
+      "metadataLastUpdated": "2025-07-02"
+    }
+  }
+]
+

@@ -1,0 +1,256 @@
+---
+title: "AMMonitor 15:  Distributing a SQLite database"
+tutorial:
+  id: "dbdistributed"
+  version: 1.0
+output: learnr::tutorial
+css: www/style.css
+csl: www/methods-in-ecology-and-evolution.csl
+runtime: shiny_prerendered
+description: "Introduces and overviews the dbDistributed function" 
+bibliography: www/dbdistributed.bib
+---
+
+```{r setup, include=FALSE}
+source('includes.R')
+shiny::addResourcePath("figs", system.file("extdata/figs", package = "AMMonitor"))
+```
+
+## ![](figs/ammonitor-hex.png){width=100px} Distributing a SQLite database for external tagging
+
+
+In the *AMMonitor* system, raw monitoring files such as recordings and photos are collected and stored either locally or in the cloud. All other data, including photo and recording metadata, are stored within a SQLite database. SQLite is a self-contained, high-reliability, embedded, full-featured, public-domain, SQL database engine. *AMMonitor* uses the R package RSQLite [@RSQLite] to connect R with the database.
+
+You can read more about SQLite here:
+
+```{r sqlite, exercise = TRUE}
+browseURL("https://www.sqlite.org/")
+```
+
+
+**However, because SQLite is a single file on your machine (local and serverless), different people on different machines cannot open it and access it simultaneously without creating conflicts.**  You definitely want to avoid this.
+
+> &#128073;&#127995;  Ideally, an *AMMonitor* project has one database manager that does most of the heavy lifting where the database is concerned.  Or possibly two, well-coordinated team-members can take on this role.   
+
+But given that tagging media is a primary task in a remote wildlife monitoring program, it is critical that a distributed workforce of data labelers (taggers) be able to make significant contributions to the database, ultimately providing information that aids in achieving the objectives of the monitoring program. Other team members may provide the crucial task of verification - the task of validating other team member's tags or validating machine learning model outputs.  
+
+> &#128073;&#127996;  To allow others to tag and verify media in an *AMMonitor* project without direct access to the SQLite database, the `dbDistributed()` function can be used to create mini, stand-alone AMMonitor projects (including a mini-database) with a subset of the original database's metadata. This mini-database can then be shared with a distributed workforce of taggers, who can label files and send them back to the primary database manager, who can then import the records into the master database with `dbDistributedImport()`.
+
+> &#128073;&#127997; Alternatively, the AMBER network (**A**lliance for **M**onitoring **B**iodiverisity **R**emotely) is a USGS collaboration in which monitoring partners utilize the USGS compute ecosystem for running models. In that system, the SQLite database is imported into a Postgres served database, where many users log in to work with the database, tag, verify, and conduct many other analyses simultanously. See the "AMBER" learnr tutorial for more details.
+
+This tutorial introduces the `dbDistributed()` and `dbDistributedImport()` functions, which creates mini-AMMonitor projects that can be distributed to others, and then re-imported back into *AMMonitor* at a later time.
+
+## Tutorial set-up
+
+> &#128073;&#127998;  For this tutorial, we will assume you are the AMMonitor database manager for Middle Earth.  A few hobbits are eager to tag and verify the media files collected by the Middle Earth monitoring team. Your task is to create mini-databases for distribution, and then import the returned results.
+
+Once again we will be working with the default mini-demo project (Middle Earth) that was loaded into a temporary directory on your machine when you launched the tutorial. 
+This filepath is stored on your machine and can be found by running the following code:
+
+```{r demofp}
+demo_fp
+```
+
+As mentioned, the main *AMMonitor* project directory has 16 subdirectories that each serve an intended purpose.  Let's look at the demo project directories and files in more depth, as certain elements are critical:
+
+```{r demofolders, exercise = TRUE}
+# look at the folders within an AMMonitor project
+list.files(demo_fp, recursive = TRUE)
+```
+
+Here, pay attention to the following folders/files in the *AMMonitor* project:
+
+- database directory -  the directory that houses the *AMMonitor* database.  The mini-database for distribution will be created from this "master" database.
+- photos and recordings - the demo project has raw media files stored in the photos and recordings directory.  Thus, "master" project utilized local media file storage. Cloud based storage in OneDrive or Google is also supported, as described below. 
+- settings directory - stores various *AMMonitor* settings as text files.  Here, two settings are of special interest:
+  - **image_path.txt** - sets the root path for images, either in the cloud or locally. This setting allows greater flexibility to the user for specifying where photos are stored, and can be used as an alternative to the filepath column of the media table when all photos are in the same folder. When included, the filepath is infered by concatenating the `image_path` with the filename. See the media tutorial for more information.
+  - **audio_path.txt** - sets the root path to audio files locally or in the cloud
+  
+If either `audio_path` or `image_path` settings are included, they will be used to infer the filepath but the new mini-database will make sure all the necessary information to render media files in the audio/photo tools are contained in the database itself. 
+
+> &#128073;&#127995; Remember, if you store media in the cloud, your team members will need to be able to authenticate into the cloud repository so they can access the media.
+
+Let's see what the demo *AMMonitor* project lists for the image and audio root paths:
+
+```{r rootpaths, exercise = TRUE}
+readLines(con = file.path(demo_fp, "settings", "image_path.txt"))
+readLines(con = file.path(demo_fp, "settings", "audio_path.txt"))
+```
+
+Note that the root paths point to the "photos" and "recordings" directories of the demo *AMMonitor* project (i.e., local storage).
+
+Let's have a quick look at the *annotations* table that comes with the sample database:
+
+```{r}
+# to work with the database, set a connection
+conx <- dbSetCon(file.path(demo_fp, "database", "demo.sqlite"))
+
+# look at the annotations table; Bilbo made annotations; Frodo will verify them
+DBI::dbReadTable(conx, name = "annotations")
+```
+
+Bilbo (bbaggins) made annotations on the photos only, which have corresponiding **fk_mediaid**'s 1:25.  In this tutorial, we will use the `dbDistributed()` function to create a mini *AMMonitor* project that we can send to Frodo (fbaggins), who will verify Bilbo's annotations. 
+
+
+## dbDistributed()
+
+The `dbDistributed()` function to be used by AMMonitor database managers creates a standalone *AMMonitor* project (optionally compressed) in the current working directory; the zipped file can be distributed to volunteers to permit them to tag or verify records by visit or date range without access to the master *AMMonitor* database.
+
+Let's look at the help page:
+
+```{r dbd, exercise = TRUE}
+help("dbDistributed", package = "AMMonitor")
+```
+
+This function has the following arguments:
+
+- **con** = An open connection to an *AMMonitor* SQLite database.  In this tutorial, we have an open connection named "conx".
+- **out_filepath** = filepath to store the new mini-project for distribution. The default is to your working directory, but here we will set create the mini project in a temporary directory.
+- **person_id** = the "pk_personid" of the person who will be receiving the mini project, as logged in the *people* table of the database (i.e., "fbaggins").
+- **media** = a vector of media ids for tagging or verification, as logged in the media table of the database.
+- **mode** = the task to be done: options include "verify" or "annotate".  In our example, Frodo will be verifying annotations made by Bilbo, so we will choose "verify".
+- **use_renv** = TRUE or FALSE. Should renv be used to create the distributed file? This argument is a placeholder for future development and the default is FALSE.
+- **disconnect** = TRUE or FALSE. Should the database connection be severed on exit? Default is FALSE.
+
+The **media_ids** argument is a vector of media ids that should be included in the mini-project/mini-database, originating from the field **pk_mediaid** in the media table. We can look back at Bilbo's annotations above and see that the media ids are numbered 1:25.
+
+> &#128073;&#127996; Database managers have much flexibility in deciding which files should be distributed for annotation. If you need to provide a large number of audio files for verification, consider using merged audio files, as explained in the "Annotations" tutorial.
+
+The function will create a directory with the name "**person_id**_**mode_date_time**", which will be compressed if specified.  This is the directory that should be distributed to Frodo.
+
+Now, let's try running the `dbDistributed()` function to create a mini-zipped file that we can send to Frodo so that he can verify photos.  The argument "use_renv" indicates how the *AMMonitor* project is to be bundled. TRUE will result in a much larger mini-project, as it will include an installation of R and all of the packages needed to work with the project.  FALSE (the default) means that the receiver (Frodo) is assumed to have R and *AMMonitor* installed on their machine (with versions that work).  We will discuss "renv" in the next section.
+
+<p class=instructions>
+Open a new session of R, and create the demo AMMonitor project and connect to it. Then, run the `dbDistributed()` function so you can see how it works. The code is provided below:
+</p>
+
+
+```{r, eval = FALSE}
+# load AMMonitor
+library(AMMonitor)
+
+# create a demo AMMonitor project in a temporary directory (to be deleted)
+demo_fp <- ammCreateMiniDemo(filepath = tempdir())
+
+# show the files of the AMMonitor demo
+list.files(demo_fp)
+
+# connect to the database
+conx <- AMMonitor::dbSetCon(paste0(demo_fp, "/database/demo.sqlite"))
+
+# create a mini project that Frodo can use for verification
+distributed_fp <- dbDistributed(
+ con = conx,
+ out_filepath = tempdir(),
+ person_id = "fbaggins", 
+ media_ids = c(1:15), 
+ mode = "verify", 
+ use_renv = FALSE,
+ disconnect = FALSE)
+
+# list the files in Frodo's project
+list.files(distributed_fp , recursive = TRUE)
+
+# launch the shiny app to confirm 
+launchApp(distributed_fp)
+
+```
+
+If you did the above exercise, you saw the Shiny app as Frodo will see it when he runs it, and he in turn will use the app to add verifications.
+
+> &#128073;&#127995; Super important!  When you distribute any database for tagging and verifications, make sure to NOT change any primary keys associated with media, mediatags, modeloutputs,  annotations, or annotags - otherwise the returned data will be disambiguated from original data.  Our intention is that `dbDistributed()` would be used carefully, and for a relatively small number of external database users who work in concert with the primary database manager and return their tags expeditiously.
+
+> &#128073;&#127997; Note that larger databases may take a significant amount of time to run the `dbDistributed()` function. If you have a very large tagging team, you might consider joining the USGS AMBER network where a cloud-based tagging platform alleviates the task of distributing and importing distributed tags to your database. 
+
+## renv
+
+One of the arguments in the `dbDistributed()` function is named "use_renv", where the options are TRUE or FALSE.  If true, the new mini-project  can be set up within an RStudio project that is "renv" enabled [@renv].  What does this mean?  A article on RStudio explains (https://rstudio.github.io/renv/articles/renv.html):
+
+
+"renv is an R dependency manager. Use renv to make your projects more:
+
+- Isolated: Each project gets its own library of R packages, so you can feel free to upgrade and change package versions in one project without worrying about breaking your other projects.
+- Portable: Because renv captures the state of your R packages within a lockfile, you can more easily share and collaborate on projects with others, and ensure that everyone is working from a common base.
+- Reproducible: Use renv::snapshot() to save the state of your R library to the lockfile renv.lock. You can later use renv::restore() to restore your R library exactly as specified in the lockfile."
+
+This video by Kevin Ushey explains the motivation and concept behind the package, renv:
+
+![](https://www.youtube.com/watch?v=yjlEbIDevOs)
+
+> &#128073;&#127997;  Setting the "use_renv" argument to TRUE will create a mini R project for distribution to monitoring team members. This project, however, will include an installation of R and all required packages that are needed -- a truly stand-alone product that can be delivered to monitoring team members who can add tags or verifications without worrying about the correct versions of R or packages needed by AMMonitor. 
+
+> &#128073;&#127998;  This feature is under development.
+
+
+## dbDistributedImport()
+
+After Frodo has added his verifications to his mini-project, he can send his mini-project database to the AMMonitor database manager, who can use  `dbDistributedImport()` to insert the new records into the master database.
+
+The `dbDistributedImport()` has the following arguments:
+
+- con = an open SQLite connection to the master AMMonitor database
+- con_distributed = an open SQLite connection to the distributed database
+- mode = "annotate" or "verify". Are the new records to be imported from an
+annotations session, or from a verifications session?
+- disconnect = TRUE or FALSE. Should the master connection be severed after the function is run? Default is FALSE
+
+The function will append the new records from the distributed database into the master database. Assuming Frodo made many verifications and sent his database to you (the Middle Earth Monitoring database manager), you can import his records with a call similar to this:
+
+```{r, eval = FALSE}
+# set a connection to the master database
+conx <- dbSetCon(paste0(demo_fp, "/database/demo.sqlite")
+
+# set a connection to Frodo's database
+conx_frodo <- dbSetCon(filepath_to_frodo_database)
+
+# import Frodo's verifications to the master database
+dbDistributedImport(
+    con = conx,
+    con_distributed = conx_frodo,
+    mode = "verify",
+    disconnect = FALSE
+    ) 
+```
+
+Of course, you will want to check the new records carefully before running this code. One option is to connect to Frodo's database, and then run the functions `dbGetSummaryData()`, `dbPlotSummary()`, and `dbTableSummary()` to review Frodo's work before import.
+
+## Tutorial summary 
+
+This tutorial introduced the `dbDistributed()` and `dbDistributedImport()` as a way to expand the number of people on a monitoring program to contribute to the *AMMonitor* "master" database.  
+
+The last step in this tutorial is to disconnect from the database, and then delete the demo database to free up space on your machine.   
+
+```{r, eval = T}
+# disconnect from database
+DBI::dbDisconnect(conx)
+
+# delete the demo 
+unlink(demo_fp)
+```
+
+We've been focusing on how add human-created tags or labels to the *AMMonitor* database. Next, we'll introduce how to use *AMMonitor* to create machine models that "tag" or "label" media files.
+
+
+```{r , eval = FALSE}
+learnr::run_tutorial(
+  name = "models", 
+  package = "AMMonitor"
+)
+```
+
+> &#128073;&#127997; A final FYI:  If you'd like a pdf of this document, use the browser "print" function (right-click, print) to print to pdf.  If you want to include quiz questions and R exercises, make sure to provide answers to them before printing.
+
+
+
+## References
+
+
+
+
+
+
+
+
+
+
+

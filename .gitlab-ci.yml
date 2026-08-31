@@ -1,0 +1,61 @@
+# AMMonitor pipeline
+
+workflow:
+  name: 'Overall package checks'
+  rules: 
+    - if: '$CI_COMMIT_BRANCH == "master" || $CI_COMMIT_BRANCH == "pipeline-fix"'
+
+# Use tidyverse docker image
+image: rocker/tidyverse
+
+stages:          # List of stages for jobs, and their order of execution
+  - build
+  - test
+
+variables:
+  R_LIBS: "$CI_PROJECT_DIR/ci/lib"
+  CHECK_DIR: "$CI_PROJECT_DIR/ci/logs"
+  BUILD_LOGS_DIR: "$CI_PROJECT_DIR/ci/logs/$CI_PROJECT_NAME.Rcheck"
+
+cmd-check-job:
+  stage: build
+  script:
+    - cd
+    - sudo apt-get update -y
+    - sudo apt-get install -y cmake
+    - sudo apt-get install -y libfftw3-dev
+    - cd $CI_PROJECT_DIR
+    - mkdir -p $R_LIBS $BUILD_LOGS_DIR
+    - R -e 'devtools::install_deps(dep = T, lib = Sys.getenv("R_LIBS"))'
+    - R -e '.libPaths()'
+    - R -e 'devtools::check(check_dir = Sys.getenv("CHECK_DIR"))'
+  artifacts:
+    paths:
+      - $R_LIBS
+
+code-coverage:
+  stage: test
+  allow_failure: true
+  when: on_success
+  coverage: "/AMMonitor Coverage: \\d+\\.\\d+/"
+  dependencies: 
+    - cmd-check-job
+  only:
+    - master
+    - pipeline-fix
+  script:
+    - cd
+    - sudo apt-get update -y
+    - sudo apt-get install -y cmake
+    - sudo apt-get install -y libfftw3-dev
+    - cd $CI_PROJECT_DIR
+    - R -e 'install.packages("DT")'
+    - R -e 'install.packages("htmltools")'
+    - R -e 'install.packages("covr")'
+    - R -e 'covr::gitlab(quiet = FALSE)'
+  artifacts:
+      paths:
+        - public
+
+
+

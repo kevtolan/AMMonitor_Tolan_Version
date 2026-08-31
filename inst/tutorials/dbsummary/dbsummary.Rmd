@@ -1,0 +1,457 @@
+---
+title: "AMMonitor 05:  Summarizing the database"
+tutorial:
+  id: "dbsummary"
+  version: 1.0
+output: learnr::tutorial
+css: www/style.css
+csl: www/methods-in-ecology-and-evolution.csl
+runtime: shiny_prerendered
+description: "Introduces the dbGetSummaryData() and follow-up functions" 
+bibliography: www/dbsummary.bib
+---
+
+```{r setup, include=FALSE}
+source('includes.R')
+shiny::addResourcePath("figs", system.file("extdata/figs", package = "AMMonitor"))
+```
+
+## ![](figs/ammonitor-hex.png){width=100px} Introduction
+
+Each *AMMonitor* project utilizes the same approach, keyed to Figure 1:
+
+```{r bookpng, eval = T, echo = F, fig.align='center', out.width = "90%", fig.cap = "*Figure 1. The adaptive management cycle employed by AMMonitor.*", out.extra='style="background-color: #999999; padding:10px; display: inline-block;"'}
+knitr::include_graphics('www/wheel.png')
+```
+
+(A) Wildlife data are collected by AMUs such as trail cameras and audio recorders to monitor mammals, birds, insects, amphibians, and bats;  
+
+(B) R functions upload media files to a local machine or to the cloud, with an option of permanent archiving in the USGS ScienceBase repository; 
+
+(C) Media files can be tagged by humans and/or analyzed with machine learning models that automate the species detection process (e.g., there is a 0.65 probability that a white-tailed deer is in this image or a 0.8 probability that this audio signal was issued by a Black-capped Chickadee); 
+
+(D) Raw and post-processed data are maintained in the project’s SQLite database;
+
+(E) R functions and scripts permit rapid, reproducible analyses of species distribution models and resulting maps, regularly updated along with metadata as new data are analyzed;  
+
+(F) These products can be the building blocks of a decision support tool, continually updated as knowledge evolves, enabling decisions to be made with the most current information.  
+
+
+As mentioned in previous tutorials, *AMMonitor* uses a SQLite relational database to track media metadata and virtually all other aspects of a monitoring effort.  
+
+A relational database is a collection of tables that are linked in some way (Figure 2). Each small square (n = 45) in the diagram below represents a table, and a few of the columns in each table are listed.  The lines between the squares indicate how columns from one table are linked to columns in a second table. The overall database structure depicted in Figure 1 is organized  to cleanly illustrate table linkages (rather than representing a workflow).  Please note that not all links are shown. 
+
+
+```{r er, eval = T, echo = F, fig.align='center', out.width = "100%", fig.cap = "*Figure 2. Database schema diagram showing relationships between AMMonitor database tables.*", out.extra='style="background-color: #999999; padding:5px; display: inline-block;"'}
+knitr::include_graphics('www/er.png')
+```
+
+You can find this image here as well:
+```{r eropen, exercise = TRUE}
+browseURL(paste0(find.package("AMMonitor"), "/extdata/figs/er.PNG"))
+```
+
+
+From a bird's-eye view, the tables are roughly partitioned into 8 groups:
+
+A. The **taxa, objectives, and library grouping** (*taxa*, *languages*, *taxonlanguage*, *library*, and *objectives* tables).  Typically, a wildlife monitoring program is motivated by the need to understand the status and trend of *taxa* of interest.  Taxonomic names are linked to the Integrated Taxonomic Information System (http://www.itis.gov), but may be referred to differently in different *languages*. An agency or organization typically establishes management objectives, such as maximizing, minimizing or maintaining abundance or occupancy at a given level.  
+
+B. The **locations table grouping** (*locations*, *temporals*, *priorities*, and *spatials* tables).  A wildlife monitoring program focuses on monitoring target species at locations.  Temporal data may be associated with these locations, as well as spatial objects that map them.  Locations may also be prioritized for monitoring effort.
+
+C. The **equipment table grouping** (*equipment*, *accounts*, *emodels*, *emodelsettingnames*, *emodelconfignames*, and *emodelconfigvalues* tables).  *AMMonitor* focuses on monitoring wildlife with remotely deployed devices, such as trail cameras, audio recorders, or cell phones.  Each device is tracked in the *equipment* table. Device model information is captured, along with the descriptions of the device's settings.  Devices may also be associated with an account (such as a Google account).
+
+D. The **media capture table grouping** (*people*, *visits*, *media*, and *logs* tables). In a monitoring program, people visit a location to deploy/check/service a monitoring unit.  During these visits, media may be captured on cards, or sent directly to the cloud.  "Virtual" visits occur in the case where devices are connected to a wireless service.  Devices may produce logs that provide metadata on the device performance.
+
+E. The **annotations table grouping** (*annotations*, *annotationverifications*, *mediatags*, *mediatagverifications*, *annotags*, and *tagverifications* tables).  Annotations consist of human-labeled tags of media files in search of target taxa or target signals (e.g., there is a moose in this photo or a chickadee in minute 2.2 in this recording).  Tags can be further described with adjectives (such as age or sex). Tags can also be applied at the media level, such as marking files of interest or identifying corrupted files.  All tags can be verified by a second observer.
+
+F. The **models table grouping** (*models*, *msettingnames*, *mconfignames*, *mconfigvalues*, *modeloutputs*, and *modelverifications* tables).  In *AMMonitor*, models typically come in two general flavors: (1) machine-learning models that inspect monitoring media in search of target taxa or signals, and (2) ecological models that estimate the status and trend of target species. Model runs can be configured by a set of inputs, with configuration values stored in the database.
+
+G. The **analysis table grouping** (*analyses* and *analysisoutputs* tables).  Analyses consists of a set of R functions that perform a certain action; analyses can be run via a function or through the *AMMonitor* Shiny interface.  The results of an analysis are fully reproducible, and are stored in an RDS file. The *analysisoutputs* table tracks the file names of analyses so that they can be used in automated reporting.
+
+H. The **lists and listitems grouping** (*lists*, *listitems*, *librarylists*, *librarylistitems*, *medialists*, and *medialistitems* tables).  These tables control database dropdowns and all tagging options that can be used to tag media files. 
+
+Last but not least, the *shinytable*, *dbdictionary*, and *sciencebase* tables reside in the upper left corner of the diagram.  These tables define the database structure, the Shiny layout, and provide information needed for a formal data release in the USGS ScienceBase repository.
+
+> &#128073;&#127996; How on earth can we easily pull out summary information from all these tables?   This tutorial introduces the `dbGetSummaryData()`, `dbPlotSummary()`, and `dbTableSummary()` functions, which provide summaries of the database in the form of plots and tables.
+
+Our intention is to provide a bird's-eye view of some of the graphical and tabular summaries of the database before getting into the weeds of each and every database table. We realize that some of these outputs may not make total sense to you at this stage, but again, we are aiming for the big picture.
+
+
+## dbGetSummaryData()
+
+To explore the database summary functions in this tutorial, we used the `ammCreateMiniDemo()` function to create a small demo project named "demoAMM", and stored  the file path to this project as the R object, "demo_fp". This filepath to the demo project on your machine is: 
+
+```{r demofp}
+demo_fp
+```
+
+The database is already present in the demo project.  Let's set the connection now:
+
+```{r, echo = TRUE, eval = TRUE}
+# set a database connection by pointing to the database filepath
+conx <- dbSetCon(paste0(demo_fp, "/database/demo.sqlite"))
+
+# look at the connection
+conx
+```
+
+
+The `dbGetSummaryData()` function generates a list of dataframes that is suitable for passing to the `dbPlotSummary()` or `dbTableSummary()` functions (coming up), enabling users to work with database information with R functions rather than making SQL calls to the database.
+
+There are only three arguments to this function:
+
+```{r}
+args(dbGetSummaryData)
+```
+
+- con	 = An open database connection
+- m_dates	= A vector of the start and end dates for monitoring summary. Default is c(NA,NA), which summarizes the entire database.
+- disconnect	= TRUE or FALSE. Should the database connection be severed on exit? Default is FALSE
+
+Let's run the function now, passing in our "conx" database connection and the start and end dates for the Middle Earth monitoring program:
+
+```{r getsummary, exercise = TRUE}
+results <- dbGetSummaryData(
+  con = conx,
+   m_dates = c("2023-05-01", "2023-12-31"),
+  disconnect = FALSE
+)
+```
+
+> &#128073;&#127997; The function itself will retrieve any media files collected within the time frame specified, and will further identify database records associated with these files. For example, it will retrieve the visits associated with the media, the locations and equipment associated with the collected media, as well as any annotations and machine annotations (modeloutputs) associated with the media.
+
+The returned object is a list of dataframes:
+
+```{r}
+# look at structure of returned object
+str(results, max.level = 1)
+```
+
+This list may be passed to the functions `dbPlotSummary()` or `dbTableSummary()`.  The returned object may be quite large, but enables users to work with database information with R functions rather than making SQL calls to the database.
+
+The dataframes returned include:
+
+- **media**: Dataframe that contains information on the media collected within the specified time span.
+
+- **field_visits**: Dataframe that contains information on field visits conducted within the specified time span.
+
+- **media_visits**: Dataframe that contains information that links media dates with visit dates.
+
+- **locations**: Dataframe that contains information on locations associated with media files collected within the specificied time span.
+
+- **annotations**: Dataframe containing information on annotations made on media files collected within the specified time span.
+
+- **annotationverifications**:  Dataframe containing information about annotations that have been checked (verified).
+
+- **annotags**: Dataframe containing "adjectives" that further describe an annotation, such as age and sex of target taxa.
+
+- **modeloutputs**: Dataframe containing information on on machine learning model outputs associated with media files collected within the specified time span.
+
+- **taxa**: Dataframe containing information on taxa associated with annotations made on media files collected within the specified time span.
+
+- **modelverifications**:  Dataframe containing information about model outputs that have been checked (verified).
+
+> &#128073;&#127998; Keep in mind that you can always use DBI functions to retrieve custom information from the database. If you don't know SQL, just use DBI::dbReadTable() to read the tables into R, then use R code to work with the tables as desired.
+
+With the outputs of `dbGetSummaryData()` in R, we won't need the open database connection for the remainder of the tutorial, so let's disconnect. Further, we can delete the demo database to free up space on your machine. 
+
+
+```{r, eval = TRUE}
+DBI::dbDisconnect(conx)
+
+# delete the demo database
+unlink(demo_fp)
+```
+
+## dbPlotSummary()
+
+With our summary data in hand, we can now pass the results to the `dbPlotSummary()` function, which provides graphical summaries of different elements of an *AMMonitor* database. `dbPlotSummary()` generates a large number of plots generated by the package *ggplot2* [@ggplot2]. These plots are "canned" outputs, but users are able to manipulate them at will with *ggplot2* functions. 
+
+Let's look at the arguments:
+
+```{r}
+args(dbPlotSummary)
+```
+
+Here, we see 5 arguments:
+
+- **summary_data**	- A list of dataframes generated from the `dbGetSummaryData()` function
+
+- **num_bins** - Number of bins to break the date columns into; default is 15 for plotting. Also could enter "month", "year", or "quarter".
+
+- **map_database** - Name of map database for plotting locations. Options are "world" or "usa" or "state" or "county"
+
+- **regions**	 - Vector of regions within the map_database for plotting (e.g., c("vermont"))
+
+- **key_species**	- Vector of taxa ids to include for additional plots and maps
+
+- **show_plots** - TRUE or FALSE. Should all ggplot objects be printed? Default is FALSE.
+
+As we'll soon see, some of the graphs are bar plots, some are histograms, and some are maps.
+
+Map boundaries are produced from the package, *maps* [@maps]. The 'map_database' argument in `dbPlotSummary()` feeds the 'database' argument from the `maps::map()` function. It is a character string naming a geographical database. The string choices include a world map, three USA databases (usa, state, county), and more. The 'regions' argument in `dbPlotSummary()` feeds the 'regions' argument from the `maps::map()` function.
+
+Let's give this function a whirl:
+
+```{r}
+plot_results <- dbPlotSummary(
+  summary_data = results,
+  num_bins = 3,
+  map_database = "state", 
+  regions = "vermont",
+  key_species = c("moose", "bear"),
+  show_plots = FALSE
+)
+```
+
+> &#128073;&#127995; The function returns a list of *ggplot2* objects.
+
+Let's look at the structure of the returned object; as you can see, it is a named list with `r length(plot_results)` elements. 
+
+```{r}
+str(plot_results, max.level = 1)
+```
+
+We attempted to make the names of each list element self-explanatory, but you may need to inspect the names yourself.
+
+```{r}
+names(plot_results)
+```
+
+Each element of this list can be retrieved and edited (inserted back into the list, if desired).
+
+Here, we'll extract the first list element, which is named "gg_media_month_year_hist". This first "canned" ggplot object is a bar chart depicting the month in which media were captured. We can extract by name or index:
+
+```{r}
+# each element that can be retrieved and edited
+plot1 <- plot_results[[1]]
+plot1
+
+```
+
+> &#128073;&#127997; If you know ggplot2 code, you can customize any of the graphs to your liking.  The intention here is that users can modify the `dbPlotSummary()` canned outputs to produce report-ready plots as desired.
+
+For example, if we want to use **viridis** color scale, we begin with a call to the ggplot object, and then add a new color scale with a call to `scale_fill_viridis_d()` function.  The viridis scales provide color maps that are perceptually uniform in both color and black-and-white. They are also designed to be perceived by viewers with common forms of color blindness.
+
+```{r}
+# customize plot1 to your liking
+plot1 <- plot1 +
+ scale_fill_viridis_d()
+
+# show the plot
+plot1
+
+```
+
+We can re-insert this updated plot back into our list, like this:
+
+```{r}
+plot_results[[1]] <- plot1
+```
+
+Let's try another example, and retrieve the plot showing the number of taxa that were annotated by hobbits in the media:
+
+```{r}
+plot2 <- plot_results[['gg_annotations_personid']]
+
+# show the plot
+plot2
+```
+
+Bilbo Baggins (bbaggins) was the only hobbit to make annotations.  This is the default plot, but we can change it as we wish. Let's change the title, make the bar color blue, flip the axis labels, and remove the legend: 
+
+```{r, eval = TRUE}
+plot2 <- plot2 +
+  labs(title = "Total Annotations by Taxa")  +
+  scale_fill_manual(values = "blue") +
+  theme(
+    legend.position = "none", 
+    axis.text.x = element_text(angle = 0))
+
+# show the plot
+plot2
+
+
+```
+
+We can save these changes back to the **plot_results** object if desired:
+
+```{r}
+# update the list
+plot_results[['gg_annotations_personid_keysp']] <- plot2
+  
+```
+
+Now, let's switch gears and look at a map that made use of the **map_database** and **regions** arguments in the call to `dbPlotSummary()`.  Recall that we passed in **map_database** = "state",  **regions** = "vermont".  These were, in turn, passed to the *maps* package to retrieve the boundary for plotting. Let's look at the default plot:
+
+```{r}
+plot_results[['gg_locations_map']]
+
+```
+
+> In the *maps* package, each database is composed of a collection of polygons, and each polygon has a unique name. When a region is composed of more than one polygon, the individual polygons have the name of the region, followed by a colon and a qualifier, as in michigan:north and michigan:south. Each element of regions is matched against the polygon names in the database and, according to exact, a subset is selected for drawing.  Type *help(package='maps')* to see the maps package index page.
+
+One final example, highlighted here to show the intention of the **keySpecies** argument in `dbPlotSummary()`.  Our function call had the `key_species` argument specified as `c("moose", "black bear")`.  This instructed the function to produce species-specific graphs that may be of interest.  For example, the following map shows where "moose" were detected by trail cameras.
+
+```{r}
+plot_results[['gg_moose_map']]
+```
+
+Here, the graph indicates that moose were not recorded at two of the three monitoring stations. Further, someone (probably Bilbo) labeled a media file at the third site, and it was further validated (confirmed) by a different hobbit.
+
+<p class = instructions>
+Your turn!  Examine several of the plots returned by the `dbPlotSummary()` function.  Just running through them one by one will give you an idea of the kinds of plots that summarize different aspects of the database.
+</p>
+
+```{r ggplotpractice, exercise = TRUE}
+
+```
+
+```{r ggplotpractice-hint}
+plot_results[[1]]
+```
+
+
+
+
+> &#128073;&#127997; The package *ggplot2* package is incredibly powerful for generating graphs in R.  It is very well supported, and there is a large community of users.
+
+Below are some useful tutorial links for working with *ggplot2*:
+
+- https://ggplot2-book.org/
+- https://ggplot2.tidyverse.org/
+- https://r-statistics.co/Complete-Ggplot2-Tutorial-Part1-With-R-Code.html
+- https://www.tutorialspoint.com/ggplot2/index.htm
+
+
+## dbTableSummary()
+
+`dbTableSummary()` provides table summaries of different elements of an *AMMonitor* database. A primary input is a list generated from the function `dbGetSummaryData()`, which extracts portions of the database for inspection and summary. The output is a list of table objects generated by the package, *gt* [@gt]. As with our ggplot objects in the previous section, the gt objects can be further manipulated by the user using the *gt* package to create professional-quality tables.
+
+```{r}
+args(dbTableSummary)
+```
+
+As the `args` function shows, there are only two arguments to this function, which parallel the `dbPlotSummary()` function:
+
+- **summary_data**	 - A list of dataframes generated from dbGetSummaryData
+
+- **key_species**	- A vector of up to ten key taxa to include for annotations and verifications tables. Default includes all taxa.
+
+Let's run the function now, again passing the **results** object created from `dbGetSummaryData()` to the function.  
+
+```{r}
+# generate summary tables
+table_results <- dbTableSummary(
+ summary_data = results,
+ key_species = c("moose", "bear")
+ )
+
+str(table_results, max.level = 1)
+```
+
+The function returns a named list of `r length(table_results)` objects, each of class "gt_tbl".  As with `dbPlotSummary()`, we attempted to name the objects by something that describes its content. A call to the `names()` function is always useful.
+
+```{r}
+names(table_results)
+```
+
+Let's look at one of the tables, again noting that you can index by number or by name:
+
+```{r}
+# let's take a look at the collected media files by year and location
+collected_media <- table_results$media_collected_per_year_location
+collected_media
+```
+
+This is a "canned" table returned from `dbTableSummary()`, but, as with `dbPlotSummary()`, users are able to manipulate the tables to their liking using *gt* functions.  For example, the code below using the native pipe to start with the **collected_media** object, *then* remove the subtitle, *then* change the column labels, and *then* add a source note.
+
+
+```{r}
+# change column names
+collected_media <- collected_media |> 
+  gt::tab_header(title = "Total Media Files", subtitle = NULL) |>
+  gt::cols_label(
+    year = "Year",
+    fk_locationid = "Location ID",
+    collected_media_files = "N") |>
+  gt::tab_source_note(
+    source_note = "*Source: AMMonitor Demo Dataset")
+
+collected_media
+```
+
+Remember to save the modified *gt* object to results list by replacing the *gt* object from the original results list with the updated table. For example:
+
+```{r}
+table_results$media_collected_per_year_location <- collected_media
+```
+
+
+<p class = instructions>
+Your turn!  Examine several of the tables returned by the `dbTableSummary()` function.  Just running through them one by one will give you an idea of the kinds of tables that summarize different aspects of the database.
+</p>
+
+```{r gtpractice, exercise = TRUE}
+
+```
+
+```{r gtpractice-hint}
+table_results[[1]]
+```
+
+> &#128073;&#127998; The *gt* package is all about making it simple to produce nice-looking display tables. Display tables? Well yes, we are trying to distinguish between data tables (e.g., tibbles, data.frames, etc.) and those tables you’d find in a web page, a journal article, or in a magazine. Such tables can likewise be called presentation tables, summary tables, or just tables really.   Source: https://gt.rstudio.com/articles/gt.html
+
+Below are some useful tutorial links for working with *gt*:
+
+- https://gt.rstudio.com/articles/gt.html
+- https://towardsdatascience.com/exploring-the-gt-grammar-of-tables-package-in-r-7fff9d0b40cd
+
+
+
+## Scripts
+
+The `dbGetSummaryData()`, `dbPlotSummary()` and `dbTableSummary()` functions provide a quick way to check the data within an *AMMonitor* database.  However, with the ability to easily customize the outputs with the packages *gt* and *ggplot2*, these outputs can be saved back into the results list for inclusion in manuscripts or reports.
+
+The "scripts" tutorial illustrates how to create reports with Quarto, where we will feature the `dbSummary()` function once again.
+
+```{r , eval = FALSE}
+learnr::run_tutorial(
+  name = "scripts", 
+  package = "AMMonitor"
+)
+```
+
+
+## Tutorial summary 
+
+This tutorial introduced the `dbGetSummaryData()`, `dbPlotSummary()` and `dbTableSummary()` workhorse functions.   The `dbPlotSummary()` function provides graphical summaries of different elements of an *AMMonitor* database, created with the package *ggplot2* [@ggplot2]. Users are able to manipulate them as desired with *ggplot2* functions. Similarly,  the `dbTableSummary()` function provides tabular summaries of different elements of an *AMMonitor* database, created with the package *gt* [@gt]. Users are able to manipulate them as desired with *gt* functions.
+
+Now that you have a big-picture understanding of the kinds of tabular and graphical outputs that can be synthesized from an *AMMonitor* database, it's time to explore the database tables in more depth. As people are arguably the most important resource for a successful monitoring program, we will begin by looking at the *people* table in depth, introducing a few new database principles along the way. 
+
+```{r , eval = FALSE}
+learnr::run_tutorial(
+  name = "people", 
+  package = "AMMonitor"
+)
+```
+  
+A list of other *AMMonitor* tutorials is shown below.  Happy coding!
+
+```{r , eval = T}
+learnr::available_tutorials("AMMonitor")
+```
+
+
+> &#128073;&#127997; A final FYI:  If you'd like a pdf of this document, use the browser "print" function (right-click, print) to print to pdf.  If you want to include quiz questions and R exercises, make sure to provide answers to them before printing.
+
+## References
+
+
+
+
+
+
+
+
+

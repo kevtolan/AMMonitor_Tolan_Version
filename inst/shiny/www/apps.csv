@@ -1,0 +1,10 @@
+appName,group,keywords,appDescription
+addTaxon,tagging,"taxon, taxa, tagging, species",Add a taxon to the database
+modelManager,models,"models, settings, configurations",Track model settings and configurations
+equipManager,equipment,"equipment, settings, configurations",Track equipment settings and configurations
+mapDeployments,locations,"locations, deployments, equipment",Map all currently active deployments
+registerVisit,media functions,"project management, photos, recordings",Register media files for a visit
+shiftMediaTime,media functions,"project management, photos, recordings",Offset dates/times for selected media files
+create_templates,modelling,"templates, audio, taxon, taxa, models",Create templates based on annotations
+create_classifiers,modelling,"templates, audio, taxon, taxa, models",Create classifier models based on template outputs
+csv_2_db,database,"database, dbdictionary",Add records from a csv file to a database table.

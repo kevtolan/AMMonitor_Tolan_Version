@@ -1,0 +1,43 @@
+p.caption{color:#777;margin-top:10px;}
+p code{white-space:inherit;}
+pre{word-break:normal;word-wrap:normal;}
+pre code{white-space:inherit;}
+
+body{ -webkit-print-color-adjust: exact; }
+
+.instructions{
+  font-size: 14px;  font-style: italic;  font-family: Arial, Helvetica, sans-serif;
+  color: black; background-color: lightsteelblue;
+  border-top: 2px solid black; border-bottom: 2px solid black;
+  margin-top: 10px; margin-bottom: 10px; padding-right: 10px; padding-left: 10px;
+}
+
+blockquote {
+  font: 14px italic Times, serif;
+  background-color: #faebbc;
+  border-top: 2px solid #e1cc89;  border-bottom: 2px solid #e1cc89;
+  }
+
+/*@media print {
+  @page { size: portrait; }
+  .topicsContainer, .topicActions { display: none; }
+  .topics .exerciseActions { display:block;}
+  .topics .tutorialTitle, .topics .section.level2, .topics .section.level3 { display: block !important;}
+  .topics { width: 100%; }
+  .tutorial-exercise, .tutorial-question { page-break-inside: avoid;}
+  .section.level3.done h3 { padding-left: 0; background-image: none;}
+  .topics .showSkip .exerciseActions::before { content: "Topic not yet completed"; }
+}
+*/
+
+@media print {
+  @page { size: portrait; }
+  .topicsContainer, .topicActions { display: none; }
+  .topics .tutorialTitle, .topics .section.level2, .topics .section.level3 { display: block !important;}
+  .topics { width: 100%; }
+  .tutorial-exercise, .tutorial-question { page-break-inside: avoid;}
+  .section.level3.done h3 { padding-left: 0; background-image: none;}
+
+}
+
+

@@ -1,0 +1,345 @@
+---
+title: "AMMonitor 18:  Scripts"
+tutorial:
+  id: "scripts"
+  version: 1.0
+output: learnr::tutorial
+css: www/style.css
+csl: www/methods-in-ecology-and-evolution.csl
+runtime: shiny_prerendered
+description: "Introduces the scripts table in an AMMonitor database." 
+bibliography: www/scripts.bib
+---
+
+```{r setup, include=FALSE}
+source('includes.R')
+shiny::addResourcePath("figs", system.file("extdata/figs", package = "AMMonitor"))
+```
+
+## ![](figs/ammonitor-hex.png){width=100px} AMMonitor scripts
+
+*AMMonitor* is a multi-purpose monitoring platform that uses (1) Autonomous Monitoring Units (AMUs) to collect media files (e.g., photos or audio recordings) with either local or cloud-based media storage, (2) SQLite as a database engine for storing and tracking all other components of the monitoring effort, including media metadata, and (3) a suite of R-based functions for analysis of monitoring data. 
+
+In other tutorials, we introduced a variety of *AMMonitor* functions that can be used to extract information from the database. However, almost certainly you will be writing your own scripts or functions to add value to those provided by the package.  This tutorial introduces the intention of the scripts directories for storing R scripts or functions or Quarto documents for reporting.
+
+>  &#128073;&#127996;  All tutorials make use of the `ammCreateMiniDemo()` function to create a small demo project named "demoAMM" that is pulled into the tutorial itself. The filepath to this project folder is stored on your machine and can be found by running the following code:
+
+```{r demofp, exercise = TRUE}
+demo_fp
+```
+
+As mentioned, an *AMMonitor* project is a directory on your machine, and includes 16 subdirectories that each serve an intended purpose.  Let's have a look.
+
+```{r demofolders, exercise = TRUE}
+# look at the folders within an AMMonitor project
+list.files(demo_fp, recursive = FALSE)
+```
+
+The **scripts** directory stores user-crafted R, Rmd, or Qmd documents that can be sourced when needed to automatically process new data or run analyses.  They can also be R functions, if desired.
+
+The demo project comes with two sample scripts, named "dbCheckAll.R" and "annualReport.qmd".
+
+```{r}
+# look at the sample photos in the mobile_apps directory
+list.files(file.path(demo_fp, "scripts"))
+```
+
+We'll look at the code for each.
+
+## dbCheckAll.R
+
+The code below shows a sample dbCheckAll.R script.  The script is fairly self-explanatory, but begins by prompting you to select the path to your *AMMonitor* database.  It then runs the suite of *AMMonitor* "check" functions that check the integrity of the database. First, `dbCheckup()` compares the SQLite database schema with that listed in the *dbdictionary* table.  It also checks for any foreign key violations.  Next, the `dbCheckCore()` function compares the SQLite database core columns against the default *AMMonitor* core columns.  You should not mess with core columns, or some *AMMonitor* functions may break.  Next, the script runs the `dbCheckData()` function, which checks the data in certain tables in an attempt to locate malformed dates, illogical data entries, or other errors. Finally, the script runs the `dbPlotSummary()` and `dbTableSummary()` functions to return a large number of tables and graphs that are useful to spot any irregularities that may exist in the database.  
+
+```
+# load AMMonitor
+library('AMMonitor')
+  
+# set a filepath to the AMMonitor database
+dbPath <- file.choose()
+    
+# set the connection to database
+con <- dbSetCon(dbPath)
+    
+# ensure dbdictionary matches the database schema
+checkup <- dbCheckup(con)
+    
+lapply(checkup, FUN = head)
+    
+# check the core columns against the default 
+core_test <- dbCheckCore(con)
+    
+lapply(core_test, FUN = head)
+    
+# check to see if problems may exist with data
+data_check <- dbCheckData(con)
+    
+lapply(data_check, FUN = head)
+    
+# get a summary of the database
+summary_data <- dbGetSummaryData(con)
+    
+# obtain plots that summarize the data
+plot_results <- dbPlotSummary(summary_data)
+    
+# obtain tables that summarize the data
+table_summary <- dbTableSummary(summary_data)
+
+```
+
+From there, you can add anything you wish.  This sort of script is one that you (the database manager) should run routinely as it will perform several checks, and allow you to visually inspect tables and figures to spot any issues.
+
+> &#128073;&#127996; You can craft your own scripts at will; this example is meant to illustrate the concept.  Scripts can be stored anywhere but we recommend adding them to the "scripts" directory of your *AMMonitor* project.
+
+## annualReport.qmd
+
+The sample **annualReport.qmd** is a Quarto script, which can be used to produce reports, scientific articles, slide shows, and many other documents intended for a broader audience. 
+
+To give you a sneak preview, the following code should launch a browser, where you can see an html version of the Middle Earth annual report built with Quarto.
+
+```{r report, exercise = TRUE}
+browseURL(paste0(find.package("AMMonitor"), "/extdata/annualreport.html"))
+```
+
+
+What is Quarto?  From https://quarto.org/ we learn that Quarto is:
+
+> An open-source scientific and technical publishing system 
+> 
+> - Author using Jupyter notebooks or with plain text markdown in your favorite editor.
+> - Create dynamic content with Python, R, Julia, and Observable.
+> - Publish reproducible, production quality articles, presentations, dashboards, websites, blogs, and books in HTML, PDF, MS Word, ePub, and more.
+> - Share knowledge and insights organization-wide by publishing to Posit Connect, Confluence, or other publishing systems.
+> - Write using Pandoc markdown, including equations, citations, crossrefs, figure panels, callouts, advanced layout, and more.
+
+
+Let's peek at the actual script now, which will produce an annual report for the Middle Earth monitoring program.  To produce the annual report objects (narration, tables, and figures), the user will pass in a filepath to the database, and then R will run the `dbSetCon()` to connect to the database, and then run the `dbGetSummaryData()`, `dbPlotResults()`, and `dbTableResults()` function to provide the information that will be featured in the report.  
+
+The first portion of the script looks like this:
+
+     ---
+     title: "Annual Report"
+     format: html
+     editor: code
+     params:
+      dbPath: "path_to_database"
+      startDate: "2023-01-01"
+      endDate: "2023-12-31"
+      author: "Gandalf"
+     ---
+
+     ## Middle Earth Annual Report
+
+     ```{r } `r ''`
+     #| echo: FALSE
+     #| resuls: hide
+     #| fig.keep: none
+     #| message: FALSE
+     #| warning: FALSE
+
+     # load required packages
+     library(AMMonitor)
+  
+     dbPath <- params$dbPath
+     startDate <- params$startDate
+     endDate <- params$endDate
+     author <- params$author
+
+     # connect to the database
+     conx <-  AMMonitor::dbSetCon(dbPath)
+
+     # run dbGetSummary
+     results <- AMMonitor::dbGetSummaryData(
+      con = conx,
+      m_dates = c(startDate, endDate),
+      disconnect = TRUE
+     )
+
+     tableresults <- AMMonitor::dbTableSummary(summary_data = results)
+
+     plotresults <- AMMonitor::dbPlotSummary(
+      summary_data = results,
+      map_database = 'state',
+      regions = 'vermont')
+
+     ```
+    
+     This annual report documents wildlife monitoring activities in Middle Earth 
+     from ` r startDate` to ` r endDate`.  The figures and tables were generated 
+     from the `dbGetSummaryData()`, `dbPlotSummary()`, and `dbTableSummary()` 
+     functions from the R package, *AMMonitor.*
+
+This is a Quarto document, identified with the **.qmd** extension.  Notice the information  neatly inserted into text between sets of three dashes (- - -) (lines 1 and 6).  This section provides the document "metadata", and is called the yaml header. It provides basic instructions for how to render the Quarto document. The **format** option specifies the document will be rendered as an HTML file, but you can output the file as PDF or Word as well. The section named **params** contains parameters for the document. Here, you modify the information after the colon and provide values that will be passed into R "code chunks", described below.  The parameter **dbPath** is a filepath to the SQLite database, the arguments **startDate** and **endDate** provide dates of the report, and the **author** parameter identifies the author.  
+
+Below the yaml header, we see styling such as **## Middle Earth Annual Report**.  The double hash tags indicate that this is a header 2 HTML tag, so this will render in large, bold font.
+
+Below the header, we see an R "code chunk", each code chunk is contained in a "fence" (the three backticks) and call to {r}. Look for the upper and lower fence that define the chunk.
+
+    ```{r} `r ''`
+    # R code is entered between the fences; 
+    # there is a lot of code here!
+    ```
+
+Within a code chunk, the section that looks like this provides the "code chunk options". 
+
+```
+  #| echo: FALSE
+  #| results: hide
+  #| fig.keep: none
+  #| message: FALSE
+  #| warning: FALSE
+```
+
+Here, we are telling Quarto to not display the chunk's R code when rendered (echo: FALSE), we wish to hide any output that may be generated by the code (results: hide), we wish to not keep any figures (fig.keep: none), we wish to supress any messages and warnings that may be generated by the R code (message: FALSE  and warning: FALSE).
+
+When the Quarto document is rendered, R will execute the code within the chunk, and the results can be used further downstream in the report.
+
+Below the code chunk, we see some narration, beginning with "This annual report documents wildlife monitoring activities in Middle Earth".  With Quarto, you can mix narration with in-line calls to R (such as the call to startDate and endDate), which then get incorporated into text.  Note this syntax isn't perfect; we had to add a space to get the tutorial to run.
+
+
+## annualReport.qmd continued
+
+The rest of the Quarto report basically presents a mix of narration, tables, and figures.
+
+          ## Field Visits
+
+          Autonomous monitoring units were deployed at ` r nrow(results$locations)` 
+          monitoring stations in Middle Earth, where devices captured wildlife on 
+          trail cameras and audio recorders (Figure 1).
+          
+          ```{r} `r ''`
+          #| echo: FALSE
+          
+          plotresults$gg_locations_map + 
+          ggplot2::labs(
+           title = "",
+           caption = paste0(
+           'Figure 1: Map of Locations for Middle Earth Wildlife Study \nbetween ',
+           startDate, ' and ', endDate)) +
+          ggplot2::theme(
+           plot.caption = ggplot2::element_text(
+            hjust = 0, 
+            size = 12))
+          ```
+          
+          
+          Field technicians made a total of ` r nrow(results$media_visits)` visits to 
+          monitoring stations to collect media files (Table 1).
+          
+          ```{r} `r ''`
+          #| cap-location: top
+          #| echo: FALSE
+          tableresults$media_visits_year_location |>
+          gt::tab_options(
+          container.width = 500,
+          table.align = 'center') |>
+          gt::tab_caption(caption = 'Table 1.')
+          ```
+          
+          ## Media Files
+          
+          At the monitoring locations, a total of ` r nrow(results$media)` files were 
+          captured in the report time period (Table 2).
+          
+          ```{r} `r ''`
+          #| echo: FALSE
+          
+          tableresults$media_count_year_type |>
+          gt::tab_options(
+          container.width = 500,
+          table.align = 'center') |>
+          gt::tab_caption(caption = 'Table 2')
+          
+          ```
+          
+          ## Annotations
+          
+          Media files (camera images and audio files) were labeled by both hobbits and 
+          machine learning models. Hobbit labeling was done with the *AMMonitor* shiny 
+          interface, in which a hobbit manually inspected media files and identified 
+          monitoring targets within.  Annotations per tagger for all taxa are shown in 
+          Figure 2.
+          
+          ```{r} `r ''`
+          #| echo: FALSE
+          
+          plotresults$gg_taxa_annotations_personid + 
+          ggplot2::labs( 
+           title = "",
+           caption = 'Figure 2: Annotations per person for all taxa.') +
+          ggplot2::theme(
+           plot.caption = ggplot2::element_text(
+            hjust = 0,
+            size = 12)
+          )
+          ```
+          
+          ## Machine Learning Detections
+          
+          The media collected by monitoring units were also labeled by machine learning 
+          models.  For the Middle Earth monitoring program, 
+          ` r length(unique(results$modelverifications$fk_modelid))` machine models are 
+          used.  A total of ` r nrow(results$modeloutputs)` model outputs were returned 
+          on media from within the report time period (Table 3).
+          
+          ```{r} `r ''`
+          #| echo: FALSE
+          tableresults$modeloutputs_year |>
+          gt::tab_options(
+           container.width = 500,
+          table.align = 'center') |>
+          gt::tab_caption(caption = 'Table 3.')
+          ```
+          
+          ## Summary
+          
+          In summary, it was a great year for the Middle Earth wildlife monitoring program. 
+          Our focus for the next year will be building species distribution models from 
+          the hobbit- and machine-tagged data.
+          
+          Respectfully submitted,
+          
+          ```{r} `r ''`
+          #| echo: FALSE
+          print(params$author)
+          ```
+          
+
+## Quarto information
+
+Hopefully you have a general idea of what a Quarto document is.  It is a fabulous tool that can be used not only in your AMMonitor projects, but in many other work related tasks. This video will give you a better idea of how it works.
+
+![](https://youtu.be/_f3latmOhew)
+
+
+There are many other Quarto resources on the web.  Here are just a few:
+
+
+- https://quarto.org/docs/get-started/hello/rstudio.html
+- https://quarto.org/docs/tools/rstudio.html
+- https://www.datacamp.com/cheat-sheet/quarto-cheat-sheet-previously-known-as-r-markdown
+
+
+
+## Tutorial summary 
+
+This chapter was a brief introduction to the intention of the **scripts** directory in an AMMonitor project. Obviously, you are free to store this information wherever you'd like, but anything that may be run routinely is a good candidate for a script.  If you are familiar with writing your own R functions, you can convert scripts to functions, and even add roxygen documentation (your own helpfiles).   
+
+A list of the available tutorials in *AMMonitor* is shown below.
+
+```{r , eval = T}
+learnr::available_tutorials("AMMonitor")
+```
+
+
+> &#128073;&#127997; A final FYI:  If you'd like a pdf of this document, use the browser "print" function (right-click, print) to print to pdf.  If you want to include quiz questions and R exercises, make sure to provide answers to them before printing.
+
+## References
+
+
+
+
+
+
+
+
+
