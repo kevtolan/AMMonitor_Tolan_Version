@@ -5,6 +5,19 @@ package) as a detection model, replacing the old Python + CSV-import
 workflow. These are project scripts, not part of the AMMonitor package
 build -- source them manually, same as you would `import_birdnet.R`.
 
+These files are **not** wired into the package's NAMESPACE, so
+`library(AMMonitor)` alone will never expose `birdsDetect()` the way it
+does `scoresDetect()` -- `source()` is required every session, regardless
+of whether you're running from this repo directly or from an installed
+copy (`system.file("birdnet", package = "AMMonitor")`).
+
+Day-to-day, keep working from your own editable copy (e.g.
+`~/R/AMMonitor_VPMon/`) rather than the one bundled in an installed
+package -- an installed package's files get wiped on every reinstall/update,
+so it's a bad place to keep something like `birdnet_species_list.csv` that
+`birdSpeciesAdd()`/`birdSpeciesRemove()` edit in place. The copy here is
+mainly a portable starting point (e.g. setting up on a new machine).
+
 ## One-time setup
 
 ```r
@@ -17,6 +30,9 @@ source("birdnet/Register_BirdNET_Species.R") # registers birdnet_species_list.cs
 ```r
 source("birdnet/birdSpeciesList.R")
 source("birdnet/birdsDetect.R")
+# or, from an installed copy:
+# source(system.file("birdnet/birdSpeciesList.R", package = "AMMonitor"))
+# source(system.file("birdnet/birdsDetect.R", package = "AMMonitor"))
 
 # review first, don't write anything yet
 birdscores <- birdsDetect(conx, recordingNames = "some_file.wav", dbInsert = FALSE)
