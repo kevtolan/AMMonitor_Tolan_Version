@@ -5,7 +5,7 @@
 > [AMMonitor](https://code.usgs.gov/vtcfwru/ammonitor/-/tree/master)
 > (USGS/GitLab, branch `AMMonitor2.2`). It largely exists as a GitHub for
 > of the GitLab-hosted original, with local customizations
-> layered on top. Full detail in [CUSTOMIZATIONS.md](CUSTOMIZATIONS.md); in
+> layered on top. Changes were largely made and pushed to Github using Claude. Full detail in [CUSTOMIZATIONS.md](CUSTOMIZATIONS.md); in
 > short:
 >
 > - **BirdNET integration** -- `birdsDetect()`, `birdSpeciesList()` /
