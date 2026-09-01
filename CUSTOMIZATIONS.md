@@ -4,13 +4,13 @@ This fork carries local changes on top of upstream AMMonitor `AMMonitor2.2`
 (commit `585b4a79`), maintained at
 [code.usgs.gov/vtcfwru/ammonitor](https://code.usgs.gov/vtcfwru/ammonitor/-/tree/master).
 Changes fall into three groups: new package functions (`R/`), the Shiny app
-(`inst/shiny/`), and bug fixes to existing package functions.
+(`inst/shiny/`), and bug fixes to existing package functions. This documented was generated using AI.
 
 ## New package functions -- BirdNET integration
 
 Adds [BirdNET](https://birdnet-team.github.io/birdnetR/) as a detection
 model via the `birdnetR` package, replacing the project's old Python +
-CSV-import workflow (`import_birdnet.R`). This documented was generated using AI.
+CSV-import workflow (`import_birdnet.R`). 
 
 - **`R/birdsDetect.R`** -- runs BirdNET against recordings and either
   returns detections for review or inserts them into `modeloutputs`.
