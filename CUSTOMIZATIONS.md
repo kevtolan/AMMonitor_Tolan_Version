@@ -39,6 +39,10 @@ since they share a calling convention:
   summary: recordings processed, total audio duration, elapsed wall-clock
   time, throughput, and how many times faster than real-time the analysis
   ran. Also returned invisibly for programmatic use.
+- **`birdsDetect()` progress output** -- prints a "Recording X of N" line
+  (X being the recording's true position in the full requested set, even
+  when split across parallel workers) before each file's BirdNET progress
+  bar, when `showProgress = TRUE`.
 - **Multicore support (`numCores` argument)** -- both functions accept
   `numCores`; when > 1, recordings are split into that many chunks and
   processed concurrently via `parallel::mclapply` (fork-based, Unix/macOS

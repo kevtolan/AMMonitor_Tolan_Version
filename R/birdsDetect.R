@@ -222,7 +222,8 @@ birdsDetect <- function(
   # Each parallel worker loads its own model rather than reusing the
   # parent's, since a loaded TensorFlow Lite interpreter (with its own
   # internal thread pool) isn't guaranteed to survive a fork cleanly.
-  process_chunk <- function(chunk_media, load_own_model) {
+  process_chunk <- function(idx, load_own_model) {
+    chunk_media <- media[idx, , drop = FALSE]
     chunk_model <- if (load_own_model) {
       birdnetR::birdnet_model_tflite(version = modelVersion, language = language)
     } else {
@@ -232,7 +233,10 @@ birdsDetect <- function(
     chunk_duration <- 0
     chunk_processed <- 0
     for (i in seq_len(nrow(chunk_media))) {
-      if (showProgress) cat(chunk_media$filename[i], "\n")
+      if (showProgress) {
+        cat("Recording", idx[i], "of", nrow(media), "\n")
+        cat(chunk_media$filename[i], "\n")
+      }
       out <- process_one_recording(
         chunk_media$pk_mediaid[i], chunk_media$filename[i], chunk_media$filepath[i], chunk_model
       )
@@ -256,7 +260,7 @@ birdsDetect <- function(
 
   if (use_parallel) {
     n_workers <- min(numCores, nrow(media))
-    chunks <- lapply(parallel::splitIndices(nrow(media), n_workers), function(idx) media[idx, , drop = FALSE])
+    chunks <- parallel::splitIndices(nrow(media), n_workers)
     worker_out <- parallel::mclapply(chunks, process_chunk, load_own_model = TRUE, mc.cores = n_workers)
 
     failed <- vapply(worker_out, inherits, logical(1), "try-error")
@@ -267,7 +271,7 @@ birdsDetect <- function(
       worker_out <- worker_out[!failed]
     }
   } else {
-    worker_out <- list(process_chunk(media, load_own_model = FALSE))
+    worker_out <- list(process_chunk(seq_len(nrow(media)), load_own_model = FALSE))
   }
 
   elapsed_sec <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
