@@ -54,8 +54,7 @@ since they share a calling convention:
 ## Bug fixes to existing package functions
 
 - **`R/birdsDetect.R`** -- recordings whose filename contains a space
-  (e.g. `ABC DEF Farm_20250515_191000.WAV`) produced an S3 URL with a
-  literal unescaped space, which `download.file()` can't fetch (fails
+  produced an S3 URL with a literal unescaped space, which `download.file()` can't fetch (fails
   silently, surfaced as "Could not access recording"). Fixed by
   URL-encoding the remote path before download.
 - **`inst/shiny/modules/app_modules/registerVisitUpdateDB.R`** -- media
