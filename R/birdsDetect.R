@@ -189,18 +189,10 @@ birdsDetect <- function(
 
     real_detections <- preds[!is.na(preds$common_name), ]
 
+    # No detections -- store nothing for this recording, rather than a
+    # placeholder "no-species" row.
     result <- if (nrow(real_detections) == 0) {
-      data.frame(
-        fk_mediaid = pk_mediaid,
-        fk_modelid = modelID,
-        fk_taxonid = "no-species",
-        x_min = NA_real_,
-        x_max = NA_real_,
-        y_min = NA_real_,
-        y_max = NA_real_,
-        value_num = NA_real_,
-        stringsAsFactors = FALSE
-      )
+      NULL
     } else {
       data.frame(
         fk_mediaid = pk_mediaid,
@@ -240,10 +232,12 @@ birdsDetect <- function(
       out <- process_one_recording(
         chunk_media$pk_mediaid[i], chunk_media$filename[i], chunk_media$filepath[i], chunk_model
       )
-      if (!is.na(out$duration)) chunk_duration <- chunk_duration + out$duration
+      if (!is.na(out$duration)) {
+        chunk_duration <- chunk_duration + out$duration
+        chunk_processed <- chunk_processed + 1
+      }
       if (!is.null(out$result)) {
         chunk_results[[i]] <- out$result
-        chunk_processed <- chunk_processed + 1
       }
     }
     list(results = do.call(rbind, chunk_results), duration = chunk_duration, processed = chunk_processed)

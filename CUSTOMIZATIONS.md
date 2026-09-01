@@ -28,6 +28,27 @@ CSV-import workflow (`import_birdnet.R`).
   ITIS TSN lookup (`ritis`), with automatic deprecated-TSN resolution and a
   common-name fallback search for anything that doesn't resolve by
   scientific name.
+- **`birdsDetect()` no longer writes a `"no-species"` placeholder row** to
+  `modeloutputs` when BirdNET finds nothing for a recording -- it now
+  stores nothing at all for that recording. `"no-species"` as a taxon tag
+  is reserved for manual annotation (a human confirming the absence of a
+  call in the Tagger), not an automated model result. Two consequences,
+  addressed together:
+  - Re-running `birdsDetect()` on a recording that previously had zero
+    detections will re-analyze it (no db row exists to mark it as
+    already-checked-and-empty). Accepted tradeoff -- re-analysis is cheap
+    relative to correctness of the taxon tag's meaning.
+  - **`R/qry.R`'s `qryModelOutputsMedia()`** (the query behind the "Model
+    Verifications" recording browse list) used an `INNER JOIN` on
+    `modeloutputs`, which would have made zero-detection recordings
+    unreachable from that tab entirely (not just empty when viewed --
+    absent from the list to browse to). Changed to a `LEFT JOIN`, with the
+    `confValue` and `excludeAnnoVerified = 'Me'` filters made NULL-safe so
+    a media row with no `modeloutputs` match at all still passes through
+    by default, rather than being silently excluded by a filter with
+    nothing to compare against. Filtering by a specific `taxonID` or
+    `model` is intentionally left strict (unrelated media shouldn't appear
+    just because a filter is active).
 
 ## New package functions -- shared detection-function improvements
 
