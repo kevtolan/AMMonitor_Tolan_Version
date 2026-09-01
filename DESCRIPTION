@@ -50,6 +50,7 @@ Imports:
     aws.s3,
     birdnetR,
     caret,
+    cli,
     data.table,
     DBI,
     exifr,

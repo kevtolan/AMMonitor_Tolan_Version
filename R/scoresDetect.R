@@ -231,6 +231,9 @@ scoresDetect <- function(
     pb <- utils::txtProgressBar(max = nrow(survey_info) * 2, style = 3)
   }
 
+  total_duration_sec <- 0
+  start_time <- Sys.time()
+
   # Run templates for each recording
   for (i in seq_len(nrow(survey_info))) {
     audio_path <- file.path(recordingRootPath, survey_info[i, 'filename'])
@@ -251,7 +254,7 @@ scoresDetect <- function(
       },
       "Wave")
 
-
+    total_duration_sec <- total_duration_sec + length(current_audio@left) / current_audio@samp.rate
 
     # Find matches for binary templates
     if (!is.null(binTemplates)) {
@@ -425,6 +428,11 @@ scoresDetect <- function(
       'modeloutputs',
       scores
     )
+  }
+
+  elapsed_sec <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
+  if (showProgress == TRUE) {
+    reportDetectionSpeed(nrow(survey_info), elapsed_sec, total_duration_sec)
   }
 
   on.exit(unlink('current_audio.wav'))

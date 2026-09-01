@@ -135,6 +135,8 @@ birdsDetect <- function(
 
   td <- tempdir(check = TRUE)
   all_results <- vector("list", nrow(media))
+  total_duration_sec <- 0
+  start_time <- Sys.time()
 
   for (i in seq_len(nrow(media))) {
     if (showProgress) cat(i, "/", nrow(media), ":", media$filename[i], "\n")
@@ -158,6 +160,12 @@ birdsDetect <- function(
       warning("Could not access recording for ", media$filename[i], "; skipping.")
       next
     }
+
+    dur_sec <- tryCatch({
+      wav_header <- tuneR::readWave(local_path, header = TRUE)
+      wav_header$samples / wav_header$sample.rate
+    }, error = function(e) NA_real_)
+    if (!is.na(dur_sec)) total_duration_sec <- total_duration_sec + dur_sec
 
     preds <- tryCatch(
       birdnetR::predict_species_from_audio_file(
@@ -203,6 +211,12 @@ birdsDetect <- function(
         stringsAsFactors = FALSE
       )
     }
+  }
+
+  elapsed_sec <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
+  n_processed <- sum(!vapply(all_results, is.null, logical(1)))
+  if (showProgress && n_processed > 0) {
+    reportDetectionSpeed(n_processed, elapsed_sec, total_duration_sec)
   }
 
   results <- do.call(rbind, all_results)
