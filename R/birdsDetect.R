@@ -144,7 +144,7 @@ birdsDetect <- function(
     local_path <- if (is_remote) {
       dest <- file.path(td, media$filename[i])
       ok <- tryCatch({
-        utils::download.file(fp, dest, mode = "wb", quiet = TRUE)
+        utils::download.file(utils::URLencode(fp, reserved = FALSE), dest, mode = "wb", quiet = TRUE)
         TRUE
       }, error = function(e) FALSE, warning = function(w) FALSE)
       if (ok) dest else NA_character_
