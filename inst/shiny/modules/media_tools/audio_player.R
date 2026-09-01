@@ -69,7 +69,7 @@ audio_player_ui <- function(id, viewer_mode) {
               6,
               wellPanel(
                 tags$h3('Audio Filters'),
-                selectInput(
+                selectizeInput(
                   ns('filterLocation'),
                   'Select a Location:',
                   choices = c('all'),
@@ -2165,7 +2165,7 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
 
     temp_locs <- AMMonitor::qryMediaLocations(con(), "audio")
 
-    updateSelectInput(
+    updateSelectizeInput(
       session,
       'filterLocation',
       choices = c('all', temp_locs),

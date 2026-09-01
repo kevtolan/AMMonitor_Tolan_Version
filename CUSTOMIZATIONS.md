@@ -84,8 +84,9 @@ since they share a calling convention:
   of data get batched into one query, regardless of `cache_size.txt` -- an
   unbounded value previously caused an out-of-memory crash. Cache size
   input defaults to 2500.
-- **Select Taxa** filter is searchable (type to filter) instead of a plain
-  scrolling dropdown (`selectInput` -> `selectizeInput`).
+- **Select Taxa** and **Select a Location** filters are searchable (type to
+  filter) instead of plain scrolling dropdowns (`selectInput` ->
+  `selectizeInput`).
 - Default Spectrogram Frequency Range changed to 0-8 kHz; default
   Spectrogram Length changed to 20s.
 - `audio_comment_box_ui()` extracted so the comment/detections box can be
