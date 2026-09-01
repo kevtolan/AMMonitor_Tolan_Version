@@ -32,23 +32,19 @@ CSV-import workflow (`import_birdnet.R`).
   `modeloutputs` when BirdNET finds nothing for a recording -- it now
   stores nothing at all for that recording. `"no-species"` as a taxon tag
   is reserved for manual annotation (a human confirming the absence of a
-  call in the Tagger), not an automated model result. Two consequences,
-  addressed together:
-  - Re-running `birdsDetect()` on a recording that previously had zero
-    detections will re-analyze it (no db row exists to mark it as
-    already-checked-and-empty). Accepted tradeoff -- re-analysis is cheap
-    relative to correctness of the taxon tag's meaning.
+  call in the Tagger), not an automated model result. Re-running
+  `birdsDetect()` on a recording that previously had zero detections will
+  re-analyze it (no db row exists to mark it as already-checked-and-empty)
+  -- accepted tradeoff, re-analysis is cheap relative to correctness of the
+  taxon tag's meaning.
   - **`R/qry.R`'s `qryModelOutputsMedia()`** (the query behind the "Model
-    Verifications" recording browse list) used an `INNER JOIN` on
-    `modeloutputs`, which would have made zero-detection recordings
-    unreachable from that tab entirely (not just empty when viewed --
-    absent from the list to browse to). Changed to a `LEFT JOIN`, with the
-    `confValue` and `excludeAnnoVerified = 'Me'` filters made NULL-safe so
-    a media row with no `modeloutputs` match at all still passes through
-    by default, rather than being silently excluded by a filter with
-    nothing to compare against. Filtering by a specific `taxonID` or
-    `model` is intentionally left strict (unrelated media shouldn't appear
-    just because a filter is active).
+    Verifications" recording browse list) uses an `INNER JOIN` on
+    `modeloutputs`, same as upstream -- only media with at least one actual
+    model detection is browsable there. (Briefly changed to a `LEFT JOIN`
+    so zero-detection recordings stayed reachable/verifiable as
+    "checked, nothing found," but reverted: browsing model outputs should
+    only surface media with real detections, not the majority of
+    recordings that have none.)
 
 ## New package functions -- shared detection-function improvements
 

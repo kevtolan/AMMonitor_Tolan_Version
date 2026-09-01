@@ -743,7 +743,7 @@ qryModelOutputsMedia <- function(con, disconnect = FALSE, locationID = 'all', da
   stmnt <- paste0(
     "SELECT DISTINCT media.pk_mediaid, media.filename, media.filepath, media.start_date, media.start_time FROM
   (media INNER JOIN visits ON media.fk_visitid = visits.pk_visitid)
-  LEFT JOIN modeloutputs ON media.pk_mediaid = modeloutputs.fk_mediaid
+  INNER JOIN modeloutputs ON media.pk_mediaid = modeloutputs.fk_mediaid
   LEFT JOIN modelverifications ON modelverifications.fk_modeloutputid = modeloutputs.pk_modeloutputid
   WHERE media.media_type = $1")
   
@@ -794,16 +794,9 @@ qryModelOutputsMedia <- function(con, disconnect = FALSE, locationID = 'all', da
   }
   
   if (!is.na(confValue)) {
-    # NULL-safe: a media row with no modeloutputs match at all (LEFT JOIN)
-    # should still pass this filter, rather than being silently excluded
-    # because there's no value_num to compare.
     where_clauses <- c(
       where_clauses,
-      paste0(
-        '(value_num ', ifelse(lessThan, paste0("<= $", param_counter), paste0(">= $", param_counter)),
-        ' OR value_num IS NULL)'
-      )
-    )
+      paste0('value_num ', ifelse(lessThan, paste0("<= $", param_counter), paste0(">= $", param_counter))))
     params[[param_counter]] <- confValue
     param_counter <- param_counter + 1
   }
@@ -814,7 +807,7 @@ qryModelOutputsMedia <- function(con, disconnect = FALSE, locationID = 'all', da
     'Me' = {
       where_clauses <- c(
         where_clauses,
-        paste0('(modeloutputs.pk_modeloutputid NOT IN (SELECT fk_modeloutputid FROM modelverifications WHERE modelverifications.fk_personid = $', param_counter, ') OR modeloutputs.pk_modeloutputid IS NULL)')
+        paste0('modeloutputs.pk_modeloutputid NOT IN (SELECT fk_modeloutputid FROM modelverifications WHERE modelverifications.fk_personid = $', param_counter, ')')
       )
       params[[param_counter]] <- selectedUser
       param_counter <- param_counter + 1
