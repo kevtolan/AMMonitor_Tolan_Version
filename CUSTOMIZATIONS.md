@@ -10,7 +10,7 @@ Changes fall into three groups: new package functions (`R/`), the Shiny app
 
 Adds [BirdNET](https://birdnet-team.github.io/birdnetR/) as a detection
 model via the `birdnetR` package, replacing the project's old Python +
-CSV-import workflow (`import_birdnet.R`).
+CSV-import workflow (`import_birdnet.R`). This was generated using AI.
 
 - **`R/birdsDetect.R`** -- runs BirdNET against recordings and either
   returns detections for review or inserts them into `modeloutputs`.
