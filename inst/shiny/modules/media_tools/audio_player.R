@@ -84,7 +84,7 @@ audio_player_ui <- function(id, viewer_mode) {
                   max = '2100-01-01',
                   startview = 'year'
                 ),
-                selectInput(
+                selectizeInput(
                   ns('filterTaxa'),
                   'Select Taxa:',
                   choices = c('all')
@@ -188,10 +188,10 @@ audio_player_ui <- function(id, viewer_mode) {
                     6,
                     numericInput(
                       ns('cache_size'),
-                      'Cache size (# of recordings, max 2500)',
-                      value = 50,
+                      'Cache size (# of recordings, max 10000)',
+                      value = 2500,
                       min = 1,
-                      max = 2500,
+                      max = 10000,
                       step = 1
                     )
                   ),
@@ -523,7 +523,7 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
     # user-typed value can otherwise request an unbounded batch, which turns
     # into a huge SQL "IN (...)" list and has previously crashed the app with
     # an out-of-memory error. This clamp applies regardless of that setting.
-    MAX_CACHE_SIZE <- 2500
+    MAX_CACHE_SIZE <- 10000
     effective_cache_size <- reactive({
       req(input$cache_size)
       min(input$cache_size, MAX_CACHE_SIZE)
@@ -553,10 +553,10 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
         updateNumericInput(
           session,
           'cache_size',
-          'Cache size (# of recordings, max 2500)',
+          'Cache size (# of recordings, max 10000)',
           value = min(cache_size, MAX_CACHE_SIZE),
           min = 1,
-          max = 2500,
+          max = 10000,
           step = 1
         )
       }
@@ -2217,7 +2217,7 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
 
     # Taxon Filters ---------------------------
 
-    updateSelectInput(
+    updateSelectizeInput(
       session,
       'filterTaxa',
       choices = c('all', sort(
