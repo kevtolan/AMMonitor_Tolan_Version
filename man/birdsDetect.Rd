@@ -14,7 +14,8 @@ birdsDetect(
   modelVersion = "v2.4",
   language = "en_us",
   dbInsert = FALSE,
-  showProgress = FALSE
+  showProgress = FALSE,
+  numCores = 1
 )
 }
 \arguments{
@@ -51,6 +52,13 @@ results are returned as a data.frame for review, and nothing is written.}
 
 \item{showProgress}{Default = FALSE. If TRUE, progress is printed while
 recordings are processed.}
+
+\item{numCores}{Default = 1. Number of CPU cores to use. When > 1,
+recordings are split into that many chunks and processed concurrently via
+\code{parallel::mclapply} (fork-based -- Unix/macOS only; falls back to
+sequential with a warning on Windows). Each worker loads its own BirdNET
+model instance rather than sharing the parent's, since a loaded TensorFlow
+Lite interpreter isn't guaranteed to survive a fork cleanly.}
 }
 \value{
 A data.frame of detections (if dbInsert = FALSE), or invisible

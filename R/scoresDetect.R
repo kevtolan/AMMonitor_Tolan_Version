@@ -37,6 +37,13 @@
 #' the score calculations.
 #' @param corMethod Default = 'pearson'. For spectrogram cross correlation templates,
 #' the method used to calculate correlation coefficients (see \code{?cor}).
+#' @param numCores Default = 1. Number of CPU cores to use. When > 1,
+#' recordings are split into that many chunks and processed concurrently via
+#' \code{parallel::mclapply} (fork-based -- Unix/macOS only; falls back to
+#' sequential with a warning on Windows). Each worker runs in its own
+#' temporary working directory, since monitoR's \code{binMatch}/\code{corMatch}
+#' write a shared \code{current_audio.wav} file as a side effect that would
+#' otherwise collide across concurrent workers.
 #' @return Data.table of scores
 #' @importFrom DBI dbGetQuery dbSendQuery dbFetch dbBind dbClearResult
 #' @importFrom AMModels getAMModel
@@ -44,6 +51,7 @@
 #' @importFrom tuneR readWave
 #' @importFrom methods as new
 #' @importFrom utils download.file
+#' @importFrom parallel mclapply splitIndices
 #' @details
 #' The recording root path argument can be NA.
 #'
@@ -129,7 +137,8 @@ scoresDetect <- function(
     ammlPath = 'amml/',
     dbInsert = FALSE,
     showProgress = FALSE,
-    corMethod = 'pearson') {
+    corMethod = 'pearson',
+    numCores = 1) {
 
   # Get recording IDs
   survey_info <- getAudioIDs(con, recordingNames)
@@ -227,12 +236,37 @@ scoresDetect <- function(
     value_num = numeric(0)
   )
 
-  if (showProgress == TRUE) {
-    pb <- utils::txtProgressBar(max = nrow(survey_info) * 2, style = 3)
+  numCores <- max(1L, as.integer(numCores))
+  use_parallel <- numCores > 1 && nrow(survey_info) > 1
+  if (use_parallel && .Platform$OS.type != "unix") {
+    warning("Multicore processing (fork-based) isn't available on Windows; running sequentially.", call. = FALSE)
+    use_parallel <- FALSE
   }
 
   total_duration_sec <- 0
   start_time <- Sys.time()
+
+  if (use_parallel) {
+    scores <- scoresDetectParallelChunks(
+      survey_info = survey_info,
+      recordingRootPath = recordingRootPath,
+      binTemplates = binTemplates,
+      corTemplates = corTemplates,
+      template_info = template_info,
+      combos = if (dbInsert) combos else NULL,
+      dup_runs = if (dbInsert) dup_runs else NULL,
+      dbInsert = dbInsert,
+      corMethod = corMethod,
+      showProgress = showProgress,
+      numCores = min(numCores, nrow(survey_info))
+    )
+    total_duration_sec <- attr(scores, "total_duration_sec")
+
+  } else {
+
+  if (showProgress == TRUE) {
+    pb <- utils::txtProgressBar(max = nrow(survey_info) * 2, style = 3)
+  }
 
   # Run templates for each recording
   for (i in seq_len(nrow(survey_info))) {
@@ -421,6 +455,8 @@ scoresDetect <- function(
       setTxtProgressBar(pb, 2*i)
     }
   }
+
+  } # end sequential-vs-parallel branch
 
   if (dbInsert == TRUE) {
     DBI::dbAppendTable(
@@ -613,4 +649,234 @@ formatDetections <- function(template_info, recording_info, detections) {
     scores <- rbind(scores, temp_scores)
   }
   return(scores)
+}
+
+#' @name scoresDetectParallelChunks
+#' @title Run scoresDetect's per-recording template matching across chunks
+#' in parallel
+#' @description An internal function. Splits survey_info into numCores
+#' chunks and runs monitoR template matching for each chunk in its own
+#' forked worker (via parallel::mclapply), each in its own temporary working
+#' directory -- monitoR's binMatch()/corMatch() write a shared
+#' "current_audio.wav" side-effect file to the working directory, which
+#' would otherwise collide across concurrent workers.
+#' @param survey_info A dataframe of recording IDs and filenames, as returned
+#' by getAudioIDs().
+#' @param recordingRootPath A character string indicating the path to the
+#' directory containing the recordings, can be local or a URL.
+#' @param binTemplates A binTemplateList object, or NULL.
+#' @param corTemplates A corTemplateList object, or NULL.
+#' @param template_info A dataframe of template info, as returned by
+#' getTemplateIDs().
+#' @param combos A dataframe of existing modeloutputs min scores, used when
+#' dbInsert = TRUE to skip already-run combinations. NULL when dbInsert is
+#' FALSE.
+#' @param dup_runs A named list of already-run template names per recording,
+#' used when dbInsert = TRUE. NULL when dbInsert is FALSE.
+#' @param dbInsert Logical flag, mirrors scoresDetect's dbInsert.
+#' @param corMethod Correlation method for spectrogram cross correlation
+#' templates.
+#' @param showProgress Logical flag, mirrors scoresDetect's showProgress.
+#' @param numCores Number of workers to run.
+#' @return A dataframe of scores, with the total audio duration analyzed (in
+#' seconds) attached as the "total_duration_sec" attribute.
+scoresDetectParallelChunks <- function(survey_info, recordingRootPath, binTemplates, corTemplates,
+                                       template_info, combos, dup_runs, dbInsert, corMethod,
+                                       showProgress, numCores) {
+
+  process_chunk <- function(chunk_survey_info) {
+    # Isolate this worker's monitoR side-effect file ("current_audio.wav",
+    # written to the working directory by binMatch()/corMatch()) from every
+    # other concurrent worker.
+    worker_wd <- tempfile("scoresDetect_worker_")
+    dir.create(worker_wd)
+    old_wd <- setwd(worker_wd)
+    on.exit(setwd(old_wd), add = TRUE)
+
+    chunk_scores <- data.frame(
+      fk_mediaid = integer(0),
+      fk_modelid = integer(0),
+      fk_taxonid = character(0),
+      x_min = numeric(0),
+      x_max = numeric(0),
+      y_min = numeric(0),
+      y_max = numeric(0),
+      value_num = numeric(0)
+    )
+    chunk_duration <- 0
+
+    for (i in seq_len(nrow(chunk_survey_info))) {
+      if (showProgress) cat(chunk_survey_info[i, 'filename'], "\n")
+
+      audio_path <- file.path(recordingRootPath, chunk_survey_info[i, 'filename'])
+      current_audio <- methods::as(
+        if (grepl("^www.|^http:|^https:", audio_path)) {
+          temp.file <- tempfile()
+          utils::download.file(
+            url = audio_path,
+            destfile = temp.file,
+            quiet = TRUE,
+            mode = "wb",
+            cacheOK = TRUE
+          )
+          if (!file.exists(temp.file)) stop("File couldn't be downloaded")
+          tuneR::readWave(temp.file)
+        } else {
+          tuneR::readWave(audio_path)
+        },
+        "Wave")
+
+      chunk_duration <- chunk_duration + length(current_audio@left) / current_audio@samp.rate
+
+      # Find matches for binary templates
+      if (!is.null(binTemplates)) {
+
+        templates <- binTemplates@templates
+        sample_rates <- c()
+        for (t in 1:length(templates)) {
+          template <- templates[[t]]
+          sample_rate <- template@samp.rate
+          sample_rates <- c(sample_rates, sample_rate)
+        }
+        sample_rate <- unique(sample_rates)
+
+        if (length(sample_rate) != 1) {
+          stop("The binary templates have different sample rates. Please select only templates with the same sample rate.")
+        }
+        if (sample_rate != current_audio@samp.rate) {
+          current_audio <- seewave::resamp(current_audio,
+                                           f = current_audio@samp.rate,
+                                           g = sample_rate,
+                                           output = "Wave")
+          message("Resampling audio to match template sample rate.")
+        }
+
+        if (dbInsert == TRUE) {
+          i_temps <- !(monitoR::templateNames(binTemplates) %in% dup_runs[[as.character(chunk_survey_info[i, 'pk_mediaid'])]])
+          if (all(i_temps == FALSE)) {
+            run_binTemplates <- NULL
+            message(paste('Detections for all binary templates for', chunk_survey_info[i, 'filename'], 'are already in the database, skipping.'))
+          } else {
+            run_binTemplates <- methods::new("binTemplateList", templates = binTemplates@templates[i_temps])
+          }
+        } else {
+          run_binTemplates <- binTemplates
+        }
+
+        if (!is.null(run_binTemplates)) {
+          errorCatch <- tryCatch({
+            binScores <- monitoR::binMatch(current_audio, run_binTemplates, write.wav = TRUE, quiet = TRUE)
+            finalBinScores <- monitoR::findPeaks(binScores)
+
+            formatted_binScores <- formatDetections(template_info, chunk_survey_info[i,], finalBinScores)
+
+            if (dbInsert == TRUE) {
+              score_mins <- merge(formatted_binScores, combos, by = c('fk_modelid', 'fk_mediaid'), all.x = TRUE)
+              i_keep <- which(score_mins$value_num < score_mins$min_score | is.na(score_mins$min_score))
+              message(paste(nrow(formatted_binScores)-length(i_keep), "rows already present in the database have been removed."))
+              formatted_binScores <- formatted_binScores[i_keep,]
+            }
+
+            chunk_scores <- rbind(chunk_scores, formatted_binScores)
+          },
+          error = function(e) {
+            e
+          },
+          finally = unlink('current_audio.wav')
+          )
+
+          if (inherits(errorCatch, "error")) {
+            message(paste0(
+              "There was an issue with file ",
+              chunk_survey_info[i, 'filename'],
+              " while running the binary templates: ",
+              errorCatch
+            ))
+          }
+        }
+      }
+
+      # Find matches for correlation templates
+      if (!is.null(corTemplates)) {
+
+        templates <- corTemplates@templates
+        sample_rates <- c()
+        for (t in 1:length(templates)) {
+          template <- templates[[t]]
+          sample_rate <- template@samp.rate
+          sample_rates <- c(sample_rates, sample_rate)
+        }
+        sample_rate <- unique(sample_rates)
+
+        if (length(sample_rate) != 1) {
+          stop("The correlation templates have different sample rates. Please select only templates with the same sample rate.")
+        }
+        if (sample_rate != current_audio@samp.rate) {
+          current_audio <- seewave::resamp(current_audio,
+                                           f = current_audio@samp.rate,
+                                           g = sample_rate,
+                                           output = "Wave")
+          message("Resampling audio to match template sample rate.")
+        }
+
+        if (dbInsert == TRUE) {
+          i_temps <- !(monitoR::templateNames(corTemplates) %in% dup_runs[[as.character(chunk_survey_info[i, 'pk_mediaid'])]])
+          if (all(i_temps == FALSE)) {
+            run_corTemplates <- NULL
+            message(paste('Detections for all correlation templates for', chunk_survey_info[i, 'filename'], 'are already in the database, skipping.'))
+          }
+          run_corTemplates <- methods::new("corTemplateList", templates = corTemplates@templates[i_temps])
+        } else {
+          run_corTemplates <- corTemplates
+        }
+
+        if (!is.null(run_corTemplates)) {
+          errorCatch <- tryCatch({
+            corScores <- monitoR::corMatch(current_audio, run_corTemplates, cor.method = corMethod, write.wav = TRUE, quiet = TRUE)
+            finalCorScores <- monitoR::findPeaks(corScores)
+
+            formatted_corScores <- formatDetections(template_info, chunk_survey_info[i,], finalCorScores)
+
+            if (dbInsert == TRUE) {
+              score_mins <- merge(formatted_corScores, combos, by = c('fk_modelid', 'fk_mediaid'), all.x = TRUE)
+              i_keep <- which(score_mins$value_num < score_mins$min_score | is.na(score_mins$min_score))
+              message(paste(nrow(formatted_corScores)-length(i_keep), "rows already present in the database have been removed."))
+              formatted_corScores <- formatted_corScores[i_keep,]
+            }
+
+            chunk_scores <- rbind(chunk_scores, formatted_corScores)
+          },
+          error = function(e) {e},
+          finally = unlink('current_audio.wav')
+          )
+
+          if (inherits(errorCatch, "error")) {
+            message(paste0(
+              "There was an issue with file ",
+              chunk_survey_info[i, 'filename'],
+              " while running the correlation templates: ",
+              errorCatch
+            ))
+          }
+        }
+      }
+    }
+
+    list(scores = chunk_scores, duration = chunk_duration)
+  }
+
+  chunks <- lapply(parallel::splitIndices(nrow(survey_info), numCores), function(idx) survey_info[idx, , drop = FALSE])
+  worker_out <- parallel::mclapply(chunks, process_chunk, mc.cores = numCores)
+
+  failed <- vapply(worker_out, inherits, logical(1), "try-error")
+  if (any(failed)) {
+    warning(sum(failed), " of ", length(worker_out), " parallel worker(s) failed and were skipped: ",
+            paste(vapply(worker_out[failed], conditionMessage, character(1)), collapse = "; "),
+            call. = FALSE)
+    worker_out <- worker_out[!failed]
+  }
+
+  scores <- do.call(rbind, lapply(worker_out, `[[`, "scores"))
+  attr(scores, "total_duration_sec") <- sum(vapply(worker_out, `[[`, numeric(1), "duration"))
+  scores
 }

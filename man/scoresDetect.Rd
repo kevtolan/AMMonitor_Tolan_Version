@@ -14,7 +14,8 @@ scoresDetect(
   ammlPath = "amml/",
   dbInsert = FALSE,
   showProgress = FALSE,
-  corMethod = "pearson"
+  corMethod = "pearson",
+  numCores = 1
 )
 }
 \arguments{
@@ -53,6 +54,14 @@ the score calculations.}
 
 \item{corMethod}{Default = 'pearson'. For spectrogram cross correlation templates,
 the method used to calculate correlation coefficients (see \code{?cor}).}
+
+\item{numCores}{Default = 1. Number of CPU cores to use. When > 1,
+recordings are split into that many chunks and processed concurrently via
+\code{parallel::mclapply} (fork-based -- Unix/macOS only; falls back to
+sequential with a warning on Windows). Each worker runs in its own
+temporary working directory, since monitoR's \code{binMatch}/\code{corMatch}
+write a shared \code{current_audio.wav} file as a side effect that would
+otherwise collide across concurrent workers.}
 }
 \value{
 Data.table of scores

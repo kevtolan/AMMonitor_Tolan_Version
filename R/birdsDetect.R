@@ -31,6 +31,12 @@
 #' results are returned as a data.frame for review, and nothing is written.
 #' @param showProgress Default = FALSE. If TRUE, progress is printed while
 #' recordings are processed.
+#' @param numCores Default = 1. Number of CPU cores to use. When > 1,
+#' recordings are split into that many chunks and processed concurrently via
+#' \code{parallel::mclapply} (fork-based -- Unix/macOS only; falls back to
+#' sequential with a warning on Windows). Each worker loads its own BirdNET
+#' model instance rather than sharing the parent's, since a loaded TensorFlow
+#' Lite interpreter isn't guaranteed to survive a fork cleanly.
 #' @return A data.frame of detections (if dbInsert = FALSE), or invisible
 #' NULL (if dbInsert = TRUE).
 #' @details Species not yet present in the taxa table are dropped with a
@@ -38,6 +44,7 @@
 #' before they can be stored in modeloutputs. Recordings hosted remotely
 #' (filepath starting with http/https, e.g. S3) are downloaded to a temp
 #' file for analysis and removed immediately after.
+#' @importFrom parallel mclapply splitIndices
 #' @examples
 #' \dontrun{
 #'
@@ -69,7 +76,8 @@ birdsDetect <- function(
     modelVersion = "v2.4",
     language = "en_us",
     dbInsert = FALSE,
-    showProgress = FALSE
+    showProgress = FALSE,
+    numCores = 1
 ) {
 
   if (!requireNamespace("birdnetR", quietly = TRUE)) {
@@ -134,17 +142,13 @@ birdsDetect <- function(
   }
 
   td <- tempdir(check = TRUE)
-  all_results <- vector("list", nrow(media))
-  total_duration_sec <- 0
-  start_time <- Sys.time()
 
-  for (i in seq_len(nrow(media))) {
-    if (showProgress) cat(i, "/", nrow(media), ":", media$filename[i], "\n")
-
-    fp <- media$filepath[i]
+  # ---- Per-recording worker, shared by the sequential and parallel paths ----
+  process_one_recording <- function(pk_mediaid, filename, filepath, use_model) {
+    fp <- filepath
     is_remote <- grepl("^https?://", fp)
     local_path <- if (is_remote) {
-      dest <- file.path(td, media$filename[i])
+      dest <- file.path(td, filename)
       ok <- tryCatch({
         utils::download.file(utils::URLencode(fp, reserved = FALSE), dest, mode = "wb", quiet = TRUE)
         TRUE
@@ -157,38 +161,37 @@ birdsDetect <- function(
     }
 
     if (is.na(local_path)) {
-      warning("Could not access recording for ", media$filename[i], "; skipping.")
-      next
+      warning("Could not access recording for ", filename, "; skipping.", call. = FALSE)
+      return(list(result = NULL, duration = NA_real_))
     }
 
     dur_sec <- tryCatch({
       wav_header <- tuneR::readWave(local_path, header = TRUE)
       wav_header$samples / wav_header$sample.rate
     }, error = function(e) NA_real_)
-    if (!is.na(dur_sec)) total_duration_sec <- total_duration_sec + dur_sec
 
     preds <- tryCatch(
       birdnetR::predict_species_from_audio_file(
-        model,
+        use_model,
         local_path,
         min_confidence = minConfidence,
         filter_species = filter_species,
         keep_empty = TRUE
       ),
       error = function(e) {
-        warning("BirdNET failed on ", media$filename[i], ": ", conditionMessage(e))
+        warning("BirdNET failed on ", filename, ": ", conditionMessage(e), call. = FALSE)
         NULL
       }
     )
 
     if (is_remote && file.exists(local_path)) unlink(local_path)
-    if (is.null(preds)) next
+    if (is.null(preds)) return(list(result = NULL, duration = dur_sec))
 
     real_detections <- preds[!is.na(preds$common_name), ]
 
-    if (nrow(real_detections) == 0) {
-      all_results[[i]] <- data.frame(
-        fk_mediaid = media$pk_mediaid[i],
+    result <- if (nrow(real_detections) == 0) {
+      data.frame(
+        fk_mediaid = pk_mediaid,
         fk_modelid = modelID,
         fk_taxonid = "no-species",
         x_min = NA_real_,
@@ -199,8 +202,8 @@ birdsDetect <- function(
         stringsAsFactors = FALSE
       )
     } else {
-      all_results[[i]] <- data.frame(
-        fk_mediaid = media$pk_mediaid[i],
+      data.frame(
+        fk_mediaid = pk_mediaid,
         fk_modelid = modelID,
         fk_taxonid = real_detections$common_name,
         x_min = real_detections$start,
@@ -211,15 +214,70 @@ birdsDetect <- function(
         stringsAsFactors = FALSE
       )
     }
+
+    list(result = result, duration = dur_sec)
+  }
+
+  # ---- Process one chunk of recordings (a "worker") ----
+  # Each parallel worker loads its own model rather than reusing the
+  # parent's, since a loaded TensorFlow Lite interpreter (with its own
+  # internal thread pool) isn't guaranteed to survive a fork cleanly.
+  process_chunk <- function(chunk_media, load_own_model) {
+    chunk_model <- if (load_own_model) {
+      birdnetR::birdnet_model_tflite(version = modelVersion, language = language)
+    } else {
+      model
+    }
+    chunk_results <- vector("list", nrow(chunk_media))
+    chunk_duration <- 0
+    chunk_processed <- 0
+    for (i in seq_len(nrow(chunk_media))) {
+      if (showProgress) cat(chunk_media$filename[i], "\n")
+      out <- process_one_recording(
+        chunk_media$pk_mediaid[i], chunk_media$filename[i], chunk_media$filepath[i], chunk_model
+      )
+      if (!is.na(out$duration)) chunk_duration <- chunk_duration + out$duration
+      if (!is.null(out$result)) {
+        chunk_results[[i]] <- out$result
+        chunk_processed <- chunk_processed + 1
+      }
+    }
+    list(results = do.call(rbind, chunk_results), duration = chunk_duration, processed = chunk_processed)
+  }
+
+  numCores <- max(1L, as.integer(numCores))
+  use_parallel <- numCores > 1 && nrow(media) > 1
+  if (use_parallel && .Platform$OS.type != "unix") {
+    warning("Multicore processing (fork-based) isn't available on Windows; running sequentially.", call. = FALSE)
+    use_parallel <- FALSE
+  }
+
+  start_time <- Sys.time()
+
+  if (use_parallel) {
+    n_workers <- min(numCores, nrow(media))
+    chunks <- lapply(parallel::splitIndices(nrow(media), n_workers), function(idx) media[idx, , drop = FALSE])
+    worker_out <- parallel::mclapply(chunks, process_chunk, load_own_model = TRUE, mc.cores = n_workers)
+
+    failed <- vapply(worker_out, inherits, logical(1), "try-error")
+    if (any(failed)) {
+      warning(sum(failed), " of ", length(worker_out), " parallel worker(s) failed and were skipped: ",
+              paste(vapply(worker_out[failed], conditionMessage, character(1)), collapse = "; "),
+              call. = FALSE)
+      worker_out <- worker_out[!failed]
+    }
+  } else {
+    worker_out <- list(process_chunk(media, load_own_model = FALSE))
   }
 
   elapsed_sec <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
-  n_processed <- sum(!vapply(all_results, is.null, logical(1)))
+  total_duration_sec <- sum(vapply(worker_out, `[[`, numeric(1), "duration"))
+  n_processed <- sum(vapply(worker_out, `[[`, numeric(1), "processed"))
   if (showProgress && n_processed > 0) {
     reportDetectionSpeed(n_processed, elapsed_sec, total_duration_sec)
   }
 
-  results <- do.call(rbind, all_results)
+  results <- do.call(rbind, lapply(worker_out, `[[`, "results"))
 
   if (is.null(results) || nrow(results) == 0) {
     message("No results produced.")
