@@ -73,6 +73,35 @@ since they share a calling convention:
   failed with "cannot open URL" for any file whose name contains a space,
   even though the URL itself was valid and public. Fixed the same way, by
   URL-encoding the path before download.
+- **`inst/shiny/modules/media_tools/audio_player.R`** -- a client-side JS
+  race: a standalone `observe()` referenced the `myAudio` audio-element
+  variable (defined inside a separate `renderUI`-generated `<script>` tag)
+  without checking it had actually been created yet. Whenever that observer
+  fired first, the browser threw `ReferenceError: myAudio is not defined`,
+  which halted Shiny's client-side reactivity for the rest of the session --
+  surfacing as "nothing loads" (filters, tables, detections all appear
+  empty) even though the server side was working fine. Fixed by guarding
+  the script with `if (typeof myAudio !== "undefined" && myAudio) { ... }`.
+  Also hardened `fullAudio()` so a failed/slow download quietly suspends
+  that one reactive (`req(FALSE)`) instead of throwing and taking every
+  dependent output (spectrogram, waveform, frequency filters) down with it.
+- **`inst/shiny/modules/media_tools/annotation_viewer_tables.R`** -- the
+  Start/End time range-filter inputs on the Taxon Model Outputs table
+  computed `ceiling(max(values))` with no guard for an empty/all-NA column
+  (e.g. a recording whose only detections are `no-species`, where
+  `x_min`/`x_max` are `NA`), which could produce `NA`/`-Inf` as the input's
+  `max` attribute. Guarded against empty/all-NA `values`. Also added
+  `ignoreInit = TRUE` to the `updateReactable()` observer tied to the same
+  table, since it otherwise fires on the very first reactive flush too, at
+  the same moment as the table's own initial render.
+  **Known open issue**: independent of the two fixes above, this table can
+  still intermittently throw a client-side React error
+  (`Cannot read properties of null (reading 'hasOwnProperty')`) together
+  with Shiny "output ... is in an unexpected state" desync errors, on this
+  fork's current test data. Root cause not yet isolated -- confirmed NOT
+  caused by `updateReactable()` (still reproduces with that observer fully
+  disabled), so the issue is inside `renderReactable()`/`output$taxon_table`
+  itself. Needs further investigation with real production data.
 
 ## Shiny app (`inst/shiny/`)
 

@@ -1536,7 +1536,8 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
     observe({
       shinyjs::runjs(paste0(
 
-        'function updateTime() {
+        'if (typeof myAudio !== "undefined" && myAudio) {
+          function updateTime() {
             Shiny.onInputChange("', ns("curTime"), '", myAudio.currentTime);
             if (myAudio.currentTime < ', round(startTime()), ' || myAudio.currentTime >= ', round(startTime()+input$specLength),') {
               myAudio.pause();
@@ -1545,8 +1546,9 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
 
           myAudio.ontimeupdate = function() {updateTime();};
 
-        // Update the current time, when triggered
-        myAudio.currentTime = ', updateCurTime()
+          // Update the current time, when triggered
+          myAudio.currentTime = ', updateCurTime(), ';
+        }'
       ))
     }) |> bindEvent(updateCurTime(), startTime(), input$specLength)
 
@@ -1579,14 +1581,20 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
       req(audio_path())
       if (grepl("^www.|^http:|^https:", audio_path())) {
         temp.file <- tempfile()
-        utils::download.file(
-          url = utils::URLencode(audio_path(), reserved = FALSE),
-          destfile = temp.file,
-          quiet = TRUE,
-          mode = "wb",
-          cacheOK = TRUE
-        )
-        if (!file.exists(temp.file)) stop("File couldn't be downloaded")
+        dl_ok <- tryCatch({
+          utils::download.file(
+            url = utils::URLencode(audio_path(), reserved = FALSE),
+            destfile = temp.file,
+            quiet = TRUE,
+            mode = "wb",
+            cacheOK = TRUE
+          )
+          file.exists(temp.file)
+        }, error = function(e) FALSE, warning = function(w) FALSE)
+        # A failed/slow download shouldn't crash every output depending on
+        # fullAudio() (spectrogram, waveform, frequency filters) at once --
+        # req(FALSE) quietly suspends this reactive instead of throwing.
+        req(dl_ok)
         tuneR::readWave(temp.file)
       } else {
         tuneR::readWave(audio_path())

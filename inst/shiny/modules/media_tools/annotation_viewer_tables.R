@@ -365,7 +365,7 @@ annotation_viewer_tables_server <- function(id, selectedUser = reactive(NA), act
                 tags$input(
                   type = "range",
                   min = 0,
-                  max = ifelse(nrow(isolate(taxon_tags())), ceiling(max(values)), 0),
+                  max = ifelse(length(values) > 0 && any(!is.na(values)), ceiling(max(values, na.rm = TRUE)), 0),
                   value = 0,
                   oninput = oninput,
                   onchange = oninput, # For IE11 support
@@ -391,8 +391,8 @@ annotation_viewer_tables_server <- function(id, selectedUser = reactive(NA), act
                 tags$input(
                   type = "range",
                   min = 0,
-                  max = ifelse(nrow(isolate(taxon_tags())), ceiling(max(values)), 0),
-                  value = ifelse(nrow(isolate(taxon_tags())), ceiling(max(values)), 0),
+                  max = ifelse(length(values) > 0 && any(!is.na(values)), ceiling(max(values, na.rm = TRUE)), 0),
+                  value = ifelse(length(values) > 0 && any(!is.na(values)), ceiling(max(values, na.rm = TRUE)), 0),
                   oninput = oninput,
                   onchange = oninput, # For IE11 support
                   "aria-label" = sprintf("Filter by minimum %s", name)
@@ -433,7 +433,7 @@ annotation_viewer_tables_server <- function(id, selectedUser = reactive(NA), act
                 tags$input(
                   type = "range",
                   min = 0,
-                  max = ifelse(nrow(isolate(taxon_tags())), ceiling(max(values)), 0),
+                  max = ifelse(length(values) > 0 && any(!is.na(values)), ceiling(max(values, na.rm = TRUE)), 0),
                   value = 0,
                   oninput = oninput,
                   onchange = oninput, # For IE11 support
@@ -459,8 +459,8 @@ annotation_viewer_tables_server <- function(id, selectedUser = reactive(NA), act
                 tags$input(
                   type = "range",
                   min = 0,
-                  max = ifelse(nrow(isolate(taxon_tags())), ceiling(max(values)), 0),
-                  value = ifelse(nrow(isolate(taxon_tags())), ceiling(max(values)), 0),
+                  max = ifelse(length(values) > 0 && any(!is.na(values)), ceiling(max(values, na.rm = TRUE)), 0),
+                  value = ifelse(length(values) > 0 && any(!is.na(values)), ceiling(max(values, na.rm = TRUE)), 0),
                   oninput = oninput,
                   onchange = oninput, # For IE11 support
                   "aria-label" = sprintf("Filter by minimum %s", name)
@@ -482,12 +482,12 @@ annotation_viewer_tables_server <- function(id, selectedUser = reactive(NA), act
     
     observeEvent(taxon_table_df(), {
       updateReactable(
-        "taxon_table", 
-        data = taxon_table_df(), 
+        "taxon_table",
+        data = taxon_table_df(),
         page = isolate(input$taxon_table__reactable__page),
         expanded = TRUE
       )
-    })
+    }, ignoreInit = TRUE)
     
     # annotags table ---------------
     file_tags <- reactive({
