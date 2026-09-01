@@ -3,7 +3,7 @@
 >
 > This is a personal fork of the original
 > [AMMonitor](https://code.usgs.gov/vtcfwru/ammonitor/-/tree/master)
-> (USGS/GitLab, branch `AMMonitor2.2`). It largely exists as a GitHub for
+> (USGS/GitLab, branch `AMMonitor2.2`). It's largely a GitHub of
 > of the GitLab-hosted original, with local customizations
 > layered on top. Changes were largely made and pushed to Github using Claude. Full detail in [CUSTOMIZATIONS.md](CUSTOMIZATIONS.md); in
 > short:
