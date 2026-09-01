@@ -3,8 +3,7 @@
 >
 > This is a personal fork of the original
 > [AMMonitor](https://code.usgs.gov/vtcfwru/ammonitor/-/tree/master)
-> (USGS/GitLab, branch `AMMonitor2.2`), maintained by its owner for a
-> vernal-pool amphibian monitoring project. It exists mainly as a GitHub
+> (USGS/GitLab, branch `AMMonitor2.2`), maintained by its owner. It exists mainly as a GitHub
 > backup/mirror of the GitLab-hosted original, with local customizations
 > layered on top. Full detail in [CUSTOMIZATIONS.md](CUSTOMIZATIONS.md); in
 > short:
