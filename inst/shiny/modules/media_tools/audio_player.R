@@ -1580,7 +1580,7 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
       if (grepl("^www.|^http:|^https:", audio_path())) {
         temp.file <- tempfile()
         utils::download.file(
-          url = audio_path(),
+          url = utils::URLencode(audio_path(), reserved = FALSE),
           destfile = temp.file,
           quiet = TRUE,
           mode = "wb",
