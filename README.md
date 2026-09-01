@@ -29,14 +29,6 @@
 
 **Remote monitoring of biodiversity in an adaptive framework**
 
-<IMG SRC= 'https://img.shields.io/static/v1?label=&message=AMMonitor&color=<"green">'>
-<IMG SRC= 'https://img.shields.io/static/v1?label=&message=R&color=<"green">'>
-<IMG SRC= 'https://img.shields.io/static/v1?label=&message=Wildlife Monitoring&color=<"green">'>
-<IMG SRC= 'https://img.shields.io/static/v1?label=&message=Adaptive Management&color=<"green">'>
-<IMG SRC= 'https://img.shields.io/static/v1?label=&message=Acoustic Monitoring&color=<"green">'>
-<IMG SRC= 'https://img.shields.io/static/v1?label=&message=Camera Monitoring&color=<"green">'>
-<IMG SRC= 'https://img.shields.io/static/v1?label=&message=VTCFWRU&color=<"green">'>
-
 <IMG SRC="https://code.usgs.gov/vtcfwru/ammonitor/raw/master/inst/extdata/figs/ammonitor-footer.png" alt="ammonitor_footer">
 
 ## Authors
