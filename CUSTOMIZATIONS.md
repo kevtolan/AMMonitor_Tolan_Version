@@ -63,6 +63,12 @@ since they share a calling convention:
   since the destination path already ended in `/` and a second `/` was
   added unconditionally when appending the filename. Fixed by stripping
   any trailing slash from the destination path first.
+- **`inst/shiny/modules/media_tools/audio_player.R`** -- same space-in-URL
+  issue as `birdsDetect()` above, but in the `fullAudio()` reactive that
+  loads a recording for the spectrogram/waveform view: `download.file()`
+  failed with "cannot open URL" for any file whose name contains a space,
+  even though the URL itself was valid and public. Fixed the same way, by
+  URL-encoding the path before download.
 
 ## Shiny app (`inst/shiny/`)
 
@@ -74,9 +80,12 @@ since they share a calling convention:
   marked invalid, plus manual annotation counts, excluding `no-species`
   tags), overwritable and saved to a new `media.ManualDetx` column.
 - **Manual Detections** filter (All / Not yet saved / Already saved).
-- Hard cap (`MAX_CACHE_SIZE`, currently 2500) on how many recordings' worth
+- Hard cap (`MAX_CACHE_SIZE`, currently 10000) on how many recordings' worth
   of data get batched into one query, regardless of `cache_size.txt` -- an
-  unbounded value previously caused an out-of-memory crash.
+  unbounded value previously caused an out-of-memory crash. Cache size
+  input defaults to 2500.
+- **Select Taxa** filter is searchable (type to filter) instead of a plain
+  scrolling dropdown (`selectInput` -> `selectizeInput`).
 - Default Spectrogram Frequency Range changed to 0-8 kHz; default
   Spectrogram Length changed to 20s.
 - `audio_comment_box_ui()` extracted so the comment/detections box can be
