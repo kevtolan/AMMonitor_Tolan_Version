@@ -1,4 +1,31 @@
 
+> ### Fork notice
+>
+> This is a personal fork of the original
+> [AMMonitor](https://code.usgs.gov/vtcfwru/ammonitor/-/tree/master)
+> (USGS/GitLab, branch `AMMonitor2.2`), maintained by its owner for a
+> vernal-pool amphibian monitoring project. It exists mainly as a GitHub
+> backup/mirror of the GitLab-hosted original, with local customizations
+> layered on top. Full detail in [CUSTOMIZATIONS.md](CUSTOMIZATIONS.md); in
+> short:
+>
+> - **BirdNET integration** -- `birdsDetect()`, `birdSpeciesList()` /
+>   `birdSpeciesAdd()` / `birdSpeciesRemove()`, `registerBirdNETModel()`,
+>   `registerBirdNETSpecies()`: new exported functions adding
+>   [BirdNET](https://birdnet-team.github.io/birdnetR/) (via `birdnetR`) as
+>   a detection model, replacing an older Python + CSV-import workflow.
+> - **Multicore support** -- `scoresDetect()` and `birdsDetect()` both
+>   accept a `numCores` argument to process recordings concurrently.
+> - **Automatic throughput reporting** -- both detection functions report
+>   elapsed time, throughput, and real-time-speed multiplier when
+>   `showProgress = TRUE`.
+> - **Bug fixes** -- a double-slash in uploaded media file paths when
+>   uploading to an S3 bucket root; a `birdsDetect()` failure on recordings
+>   whose filenames contain spaces.
+> - **Shiny app customizations** -- per-recording comments, manual
+>   detection-count overrides, AudioMoth metadata capture on visit
+>   registration, and Taxon Model Outputs table UI improvements.
+
 # AMMonitor
 
 **Remote monitoring of biodiversity in an adaptive framework**
