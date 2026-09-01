@@ -4,7 +4,7 @@
 > This is a fork of the original
 > [AMMonitor](https://code.usgs.gov/vtcfwru/ammonitor/-/tree/master)
 > (USGS/GitLab, branch `AMMonitor2.2`) with personal customizations
-> and commands. Changes were primarily made and pushed to GitHub using Claude Sonnet 5. Full detail in [CUSTOMIZATIONS.md](CUSTOMIZATIONS.md):
+> and commands. Changes were primarily made and pushed to GitHub using Claude Sonnet 5. Full change details in [CUSTOMIZATIONS.md](CUSTOMIZATIONS.md):
 >
 > - **BirdNET integration** -- `birdsDetect()`, `birdSpeciesList()` /
 >   `birdSpeciesAdd()` / `birdSpeciesRemove()`, `registerBirdNETModel()`,
