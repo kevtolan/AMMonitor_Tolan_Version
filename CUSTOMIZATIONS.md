@@ -210,6 +210,18 @@ since they share a calling convention:
   `recorded_datetime_local`, `device_serial`, `gain_setting`,
   `battery_voltage`, `temperature_c` (all new `media` columns).
 
+### `modules/app_modules/registerVisitMediaType.R`
+
+- "Select Media Type" defaults to `audio` instead of `photo`.
+
+### `modules/app_modules/registerVisitMetadata.R`
+
+- "Select existing visit" shows location and visit date alongside the
+  visit ID (`"1 -- Site_A2024 -- 2025-02-27"`) instead of a bare
+  visit number, so it's actually possible to tell visits apart when
+  picking one to add media to. The underlying selected value is still
+  just the plain `pk_visitid`.
+
 ### `ui.R`
 
 - Wires `audio_comment_box_ui()` into all four Audio sub-tabs.

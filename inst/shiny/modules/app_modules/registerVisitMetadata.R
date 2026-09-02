@@ -137,21 +137,26 @@ registerVisitMetadata_server <- function(id, mediaType) {
     observe({
       req(mediaType())
       
+      existing_visits <- DBI::dbGetQuery(
+        con(),
+        paste0(
+          "SELECT pk_visitid, fk_locationid, visit_date FROM visits INNER JOIN equipment ON visits.fk_equipmentid = equipment.pk_equipmentid WHERE equip_type IS NULL OR equip_type = 'cell phone' OR ",
+          switch(
+            mediaType(),
+            'photo' = "equip_type IN ('camera', 'drone')",
+            'audio' = "equip_type = 'recorder'"
+          ),
+          ";"
+        )
+      )
+
       updateSelectizeInput(
         session = session,
         inputId = 'pk_visitid',
-        choices = DBI::dbGetQuery(
-          con(),
-          paste0(
-            "SELECT pk_visitid FROM visits INNER JOIN equipment ON visits.fk_equipmentid = equipment.pk_equipmentid WHERE equip_type IS NULL OR equip_type = 'cell phone' OR ",
-            switch(
-              mediaType(),
-              'photo' = "equip_type IN ('camera', 'drone')",
-              'audio' = "equip_type = 'recorder'"
-            ),
-            ";"
-          )
-        )[,]
+        choices = setNames(
+          existing_visits$pk_visitid,
+          paste0(existing_visits$pk_visitid, " -- ", existing_visits$fk_locationid, " -- ", existing_visits$visit_date)
+        )
       )
     })
     

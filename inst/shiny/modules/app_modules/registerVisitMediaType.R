@@ -14,7 +14,8 @@ registerVisitMediaType_ui <- function(id) {
     selectInput(
       ns('mediaType'),
       'Select Media Type',
-      choices = c('photo', 'audio')
+      choices = c('photo', 'audio'),
+      selected = 'audio'
     )
   )
 }
