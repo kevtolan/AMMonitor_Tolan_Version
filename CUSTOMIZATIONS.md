@@ -79,6 +79,18 @@ since they share a calling convention:
   monitoR's `binMatch()`/`corMatch()` write a shared `current_audio.wav`
   side-effect file that would otherwise collide across concurrent workers
   (see new internal `scoresDetectParallelChunks()`).
+- **`birdsDetect()` silences the Python `resource_tracker` leaked-semaphore
+  warning** (`UserWarning: resource_tracker: There appear to be N leaked
+  semaphore objects...`) printed at Python interpreter shutdown -- harmless,
+  but noisy, especially with `numCores > 1` where it can print once per
+  forked worker. Sets `PYTHONWARNINGS` both via `Sys.setenv()` (so a fresh
+  Python interpreter, including each `mclapply` fork, picks it up at
+  startup) and directly in Python's `os.environ` via `reticulate::py_run_string()`
+  when Python is already running (since `PYTHONWARNINGS` is otherwise only
+  read once at interpreter startup, and BirdNET's Python interpreter
+  persists across repeated `birdsDetect()` calls in the same R session).
+  Scoped narrowly to `UserWarning`s from `multiprocessing.resource_tracker`
+  only, so other Python warnings still surface normally.
 
 ## Bug fixes to existing package functions
 
@@ -170,10 +182,17 @@ since they share a calling convention:
 ### `modules/media_tools/audio_player.R`
 
 - Per-recording **Comments** box + save button (new `media.comments` column).
-- **Manual Detections** box: defaults to a live model-output count
-  (`modeloutputs` with `value_num >= 14`, excluding anything a verifier
-  marked invalid, plus manual annotation counts, excluding `no-species`
-  tags), overwritable and saved to a new `media.ManualDetx` column.
+- **Manual Detections** box: defaults to a live model-output count (every
+  non-invalidated `modeloutputs` row for the recording -- presence in the
+  table already means it cleared whatever threshold the model was run
+  with, plus manual annotation counts, excluding `no-species` tags),
+  overwritable and saved to a new `media.ManualDetx` column. On the Model
+  Verifications page, the count also respects the live "Model
+  Value"/"Less than Value" filter so it matches the table shown below it.
+  (Originally hardcoded a `value_num >= 14` cutoff meant for monitoR's
+  score scale; this silently zeroed the count for BirdNET, whose
+  confidence values run 0-1 -- fixed here and in the matching copy in
+  `audio_annotator.R`.)
 - **Manual Detections** filter (All / Not yet saved / Already saved).
 - Hard cap (`MAX_CACHE_SIZE`, currently 10000) on how many recordings' worth
   of data get batched into one query, regardless of `cache_size.txt` -- an
@@ -190,6 +209,17 @@ since they share a calling convention:
 - Fixed a crash in the "jump to selected row" observer when multiple rows
   are selected (`==` replaced with `%in%`; scalar checks now use the first
   selected row explicitly).
+- `audio_avail` (the filtered recording list) no longer auto-loads with
+  blank/default filters on tab open. Previously an `eventReactive`
+  triggered by an `audio_on_startup` flag, it now fires only on the "Apply
+  Filters" button (`ignoreInit = TRUE`) -- fixes a slow, unwanted
+  spectrogram render for an arbitrary recording every time Model
+  Verifications (or any other audio_player-based tab) is opened, before
+  the user has chosen a filter.
+- `cache_size.txt` is now read with `readLines()` instead of `read.csv()`,
+  so a file without a trailing newline (the common case when it's been
+  hand-edited) no longer prints an "incomplete final line" warning on
+  every app start. Same change in `image_viewer.R`.
 
 ### `modules/media_tools/audio_annotator.R`
 
@@ -197,6 +227,12 @@ since they share a calling convention:
   panel. Tracks its own just-saved state locally, since it receives the
   shared metadata cache as a read-only reactive getter rather than a
   `reactiveValues` object.
+
+### `modules/media_tools/image_viewer.R`
+
+- Same fix as `audio_player.R` above: `photos_avail` now only loads on
+  "Apply Filters" (`ignoreInit = TRUE`) instead of also firing once on tab
+  open with blank/default filters.
 
 ### `modules/media_tools/annotation_viewer_tables.R`
 
@@ -207,6 +243,15 @@ since they share a calling convention:
 - Flag shown above the table when the current recording has manual (human)
   annotations, so a model-output reviewer knows tagger activity exists on
   this file even though the table itself only shows model detections.
+- Fixed a crash in that same manual-annotation flag: `metadata_cache()`'s
+  `annotations` field starts out as a bare `NA` (not a data.frame) until
+  the audio player's own cache-population observer has run at least once
+  for the newly-selected recording. Since Shiny doesn't guarantee that
+  observer runs before this flag's `renderUI` on the same reactive flush,
+  reading `NA$fk_mediaid` off it could throw `$ operator is invalid for
+  atomic vectors` when opening Model Verifications (or right after
+  pressing Apply Filters). Now guarded with
+  `req(is.data.frame(metadata_cache()$cache$annotations))`.
 
 ### `modules/app_modules/registerVisitUpdateDB.R`
 

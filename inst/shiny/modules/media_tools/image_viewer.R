@@ -337,11 +337,14 @@ image_viewer_server <- function(id, selectedUser = reactive(NA), active = reacti
     date_ranges <- reactiveVal(AMMonitor::qryMediaDateRange(con(), "photo"))
     
     if (file.exists(paste(ammPath, 'settings', 'cache_size.txt', sep = '/'))) {
-      cache_size <- read.csv(
+      # readLines (not read.csv) so a file without a trailing newline -- the
+      # common case when it's been hand-edited -- doesn't print a spurious
+      # "incomplete final line" warning on every app start.
+      cache_size <- suppressWarnings(as.numeric(trimws(readLines(
         paste(ammPath, 'settings', 'cache_size.txt', sep = '/'),
-        header = F
-      )[,]
-      if (is.numeric(cache_size)) {
+        warn = FALSE
+      )[1])))
+      if (is.numeric(cache_size) && !is.na(cache_size)) {
         updateNumericInput(
           session,
           'cache_size',
@@ -402,9 +405,12 @@ image_viewer_server <- function(id, selectedUser = reactive(NA), active = reacti
     })
     
     photos_on_startup <- reactiveVal(1) # For altering startup behavior of apply_filters
-    
-    # Filtered dataframe of available photos
-    photos_avail <- eventReactive(list(input$apply_filters, photos_on_startup), {
+
+    # Filtered dataframe of available photos. ignoreInit = TRUE so this
+    # doesn't run (and render a photo) until the user actually presses
+    # Apply Filters -- previously it fired once on load with the blank/default
+    # filters, which was slow and showed a photo nobody asked to see.
+    photos_avail <- eventReactive(input$apply_filters, {
       # First, save metadata cache (if needed)
       if (
         photos_on_startup() != 1 && 
@@ -493,7 +499,7 @@ image_viewer_server <- function(id, selectedUser = reactive(NA), active = reacti
       i_photo(1)
       i_cache(1)
       photos
-    })
+    }, ignoreInit = TRUE)
     
     i_cache <- reactiveVal(1) # Initialize cache counter
     

@@ -110,6 +110,22 @@ birdsDetect <- function(
     return(invisible(NULL))
   }
 
+  # ---- Silence a cosmetic Python multiprocessing warning ----
+  # ("resource_tracker: There appear to be N leaked semaphore objects...")
+  # printed at Python interpreter shutdown, harmless but noisy -- one per
+  # forked worker under numCores > 1. Set both in R's environment (so a
+  # fresh Python interpreter picks it up at startup, including in every
+  # mclapply fork below, which inherits this process's environment) and
+  # directly in Python's os.environ (so it also takes effect if Python was
+  # already initialized by an earlier call in this R session, since
+  # PYTHONWARNINGS is only read by Python at interpreter startup).
+  Sys.setenv(PYTHONWARNINGS = "ignore::UserWarning:multiprocessing.resource_tracker")
+  if (requireNamespace("reticulate", quietly = TRUE) && reticulate::py_available(initialize = FALSE)) {
+    reticulate::py_run_string(
+      "import os; os.environ['PYTHONWARNINGS'] = 'ignore::UserWarning:multiprocessing.resource_tracker'"
+    )
+  }
+
   # ---- Load the model once, reused across all recordings ----
   model <- birdnetR::birdnet_model_tflite(version = modelVersion, language = language)
 

@@ -131,6 +131,11 @@ annotation_viewer_tables_server <- function(id, selectedUser = reactive(NA), act
     output$manual_annotation_flag <- renderUI({
       req(viewer_mode == "modelOutputs")
       req(file_name())
+      # metadata_cache()$cache$annotations starts out as a bare NA (not a
+      # data.frame) until the audio player's cache-population observer has
+      # run at least once -- reading $fk_mediaid off it before then crashes
+      # with "$ operator is invalid for atomic vectors". Wait for real data.
+      req(is.data.frame(metadata_cache()$cache$annotations))
 
       annotation_count <- sum(
         metadata_cache()$cache$annotations$fk_mediaid == file_name() &

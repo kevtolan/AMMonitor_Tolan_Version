@@ -545,11 +545,14 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
     date_ranges <- reactiveVal(AMMonitor::qryMediaDateRange(con(), "audio"))
 
     if (file.exists(paste(ammPath, 'settings', 'cache_size.txt', sep = '/'))) {
-      cache_size <- read.csv(
+      # readLines (not read.csv) so a file without a trailing newline -- the
+      # common case when it's been hand-edited -- doesn't print a spurious
+      # "incomplete final line" warning on every app start.
+      cache_size <- suppressWarnings(as.numeric(trimws(readLines(
         paste(ammPath, 'settings', 'cache_size.txt', sep = '/'),
-        header = F
-      )[,]
-      if (is.numeric(cache_size)) {
+        warn = FALSE
+      )[1])))
+      if (is.numeric(cache_size) && !is.na(cache_size)) {
         updateNumericInput(
           session,
           'cache_size',
@@ -670,8 +673,11 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
 
     audio_on_startup <- reactiveVal(1) # For altering startup behavior of apply_filters
 
-    # Filtered dataframe of available recordings
-    audio_avail <- eventReactive(list(input$apply_filters, audio_on_startup), {
+    # Filtered dataframe of available recordings. ignoreInit = TRUE so this
+    # doesn't run (and render a spectrogram) until the user actually presses
+    # Apply Filters -- previously it fired once on load with the blank/default
+    # filters, which was slow and showed a spectrogram nobody asked to see.
+    audio_avail <- eventReactive(input$apply_filters, {
       output$filters_applied <- renderText("")
       audios <- switch(
         viewer_mode,
@@ -763,7 +769,7 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
       i_audio(1)
       i_cache(1)
       audios
-    })
+    }, ignoreInit = TRUE)
 
     i_cache <- reactiveVal(1) # Initialize cache counter
 
@@ -1075,15 +1081,31 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
     # as the displayed default whenever media.ManualDetx hasn't been set.
     # Includes unverified detections and those verified valid; excludes only
     # detections some verifier has explicitly marked invalid (is_valid = 0).
+    # A row's mere presence in modeloutputs already means it cleared
+    # whatever detection threshold was configured when the model produced
+    # it (birdsDetect()/scoresDetect()), so no extra numeric cutoff is
+    # applied here -- this used to hardcode `value_num >= 14`, which only
+    # ever matched monitoR's score scale and silently zeroed out the count
+    # for BirdNET, whose confidence values run 0-1. On the Model
+    # Verifications page only, this still respects the live "Model
+    # Value"/"Less than Value" filter so the count matches the table shown
+    # below it.
     current_model_output_count <- reactive({
       req(nrow(audio_avail()) > 0)
       current_pk <- audio_avail()$pk_mediaid[i_audio()]
 
-      these_ids <- metadata_cache$cache$modeloutputs$pk_modeloutputid[
-        metadata_cache$cache$modeloutputs$fk_mediaid == current_pk &
-          !is.na(metadata_cache$cache$modeloutputs$value_num) &
-          metadata_cache$cache$modeloutputs$value_num >= 14
-      ]
+      base_mask <- metadata_cache$cache$modeloutputs$fk_mediaid == current_pk &
+        !is.na(metadata_cache$cache$modeloutputs$value_num)
+
+      if (viewer_mode == "modelOutputs" && !is.null(input$modelConf) && !is.na(input$modelConf)) {
+        base_mask <- base_mask & if (isTRUE(input$modelLessThan)) {
+          metadata_cache$cache$modeloutputs$value_num <= input$modelConf
+        } else {
+          metadata_cache$cache$modeloutputs$value_num >= input$modelConf
+        }
+      }
+
+      these_ids <- metadata_cache$cache$modeloutputs$pk_modeloutputid[base_mask]
       invalid_ids <- unique(metadata_cache$cache$modelverifications$fk_modeloutputid[
         metadata_cache$cache$modelverifications$is_valid == 0
       ])

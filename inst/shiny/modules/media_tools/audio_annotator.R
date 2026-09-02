@@ -99,13 +99,14 @@ audio_annotator_server <- function(id, selectedUser = reactive(NA), audio_name, 
     # Live count of modeloutputs for this recording -- used as the displayed
     # default whenever media.ManualDetx hasn't been set. Mirrors the same
     # logic in audio_player.R: includes unverified and verified-valid
-    # detections with value_num >= 14; excludes any explicitly marked invalid.
+    # detections (any row present already cleared whatever threshold the
+    # model was run with -- no extra hardcoded cutoff here); excludes any
+    # explicitly marked invalid.
     current_model_output_count <- reactive({
       req(audio_name())
       these_ids <- metadata_cache()$cache$modeloutputs$pk_modeloutputid[
         metadata_cache()$cache$modeloutputs$fk_mediaid == audio_name() &
-          !is.na(metadata_cache()$cache$modeloutputs$value_num) &
-          metadata_cache()$cache$modeloutputs$value_num >= 14
+          !is.na(metadata_cache()$cache$modeloutputs$value_num)
       ]
       invalid_ids <- unique(metadata_cache()$cache$modelverifications$fk_modeloutputid[
         metadata_cache()$cache$modelverifications$is_valid == 0
