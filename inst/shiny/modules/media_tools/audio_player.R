@@ -774,8 +774,18 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
     i_cache <- reactiveVal(1) # Initialize cache counter
 
     metadata_cache <- reactiveValues(
-      i_cache_start = NA,
-      i_cache_end = NA,
+      # 1/0 (an empty range), not NA: audio_avail() no longer loads on tab
+      # open (only on Apply Filters -- see the ignoreInit fix above), so
+      # these can now sit unpopulated for a while. NA here made
+      # `i_audio() < i_cache_start || i_audio() > i_cache_end` below throw
+      # "missing value where TRUE/FALSE needed" as soon as anything read
+      # i_audio() before the cache populated, which took the whole Shiny
+      # session down (an uncaught error in an observe() is fatal, not just
+      # suspended). i_cache_end also already doubles as an "is the cache
+      # populated yet" flag elsewhere (`i_cache_end != 0`), so 0 is the
+      # correct empty-state value, not an arbitrary placeholder.
+      i_cache_start = 1,
+      i_cache_end = 0,
       cache = list(
         mediaMetaData = NA,
         annotations = NA,
@@ -838,6 +848,13 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
       # First, save any unsaved tags (if needed)
       if (
         audio_on_startup() != 1 &&
+        # is.data.frame() first, not just nrow() != 0: nrow(NA) is NULL, and
+        # NULL != 0 is logical(0), which doesn't reliably short-circuit the
+        # rest of this && chain (it can still evaluate the subsetting below
+        # against the cache's still-NA placeholders and throw "incorrect
+        # number of dimensions"). is.data.frame(NA) is a clean FALSE, which
+        # && does short-circuit on.
+        is.data.frame(metadata_cache$cache$mediaMetaData) &&
         nrow(metadata_cache$cache$mediaMetaData) != 0 && (
           any(metadata_cache$cache$annotations[,c('is_add', 'is_delete')] == 1) ||
           any(metadata_cache$cache$annotags[,c('is_add', 'is_delete')] == 1) ||
@@ -2221,16 +2238,16 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
     })
 
     # Date range filter ------------------------
-    # Reset date ranges when you select a new location
-    if (isolate(nrow(audio_avail())) != 0) {
-      updateDateRangeInput(
-        session,
-        'filterDateRange',
-        start = date_ranges()$startdate,
-        end = date_ranges()$enddate
-      )
-    }
-
+    # Reset date ranges when you select a new location. (This used to also
+    # run once, unconditionally, right here at module setup, to catch the
+    # case where audio_avail() already had data from the default filters --
+    # but audio_avail() no longer loads anything until Apply Filters is
+    # pressed, so at this point in module setup it's *always* still
+    # unfired. Reading an eventReactive() that has never fired throws a
+    # shiny.silent.error same as req(FALSE) would, and this standalone
+    # top-level `if` -- unlike the observeEvent() below, which has its own
+    # silent-error boundary -- had nothing to catch it, which took down
+    # this whole module's setup and broke Model Verifications entirely.)
     observeEvent(input$filterLocation, priority = 9998, {
       if (!is.null(input$filterVisitTable__reactable__selected)) {
         visitID(NULL)

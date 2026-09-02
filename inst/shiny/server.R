@@ -365,11 +365,20 @@ server <- function(input, output, session) {
   audio_model_verifier_loaded <- reactiveVal(FALSE)
   observe({
     req(con())
-    if (isolate(audio_model_verifier_loaded() == FALSE)) {
-      req(input$tabs == "Audio" && input$audio_tabs == "Model Verifications")
-      audio_model_verifier_loaded(TRUE)
-    }
-    
+    # Unconditional req(), not the isolate()-guarded if() this used to be:
+    # that only gated *when* the block first proceeded past this point, not
+    # whether it could run again later. Once con()/input$tabs/input$audio_tabs
+    # settle, Shiny can re-trigger this observe() (e.g. from reactive reads
+    # inside the modules just below attaching new dependencies to it), which
+    # re-called annotation_viewer_tables_server()/audio_player_server() with
+    # the same ids a second time -- moduleServer() doesn't support that, and
+    # it surfaced as "object 'audio_modelOutput_player_output' not found"
+    # elsewhere in the app. This req() makes every run after the first a
+    # true no-op.
+    req(isolate(audio_model_verifier_loaded()) == FALSE)
+    req(input$tabs == "Audio" && input$audio_tabs == "Model Verifications")
+    audio_model_verifier_loaded(TRUE)
+
     audio_modelOutput_tables_output <- annotation_viewer_tables_server(
       id = "modelOutput_viewer_tables_audio",
       selectedUser = reactive(my_home_outputs$selectedUser()),

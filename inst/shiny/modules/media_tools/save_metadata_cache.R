@@ -8,6 +8,16 @@
 #' @usage save_metadata_cache(metadata_cache, annotations_cache)
 #' @return An updated copy of the metadata cache, based on any db updates.
 save_metadata_cache <- function(metadata_cache, annotations_cache) {
+  # Nothing to flush if the cache hasn't been populated with real data yet
+  # -- its fields still hold their initial NA placeholders until
+  # audio_avail() has fired at least once (e.g. before Apply Filters is
+  # first pressed). One of the two call sites in audio_player.R (the
+  # save_metadata_now observer) has no other guard for this, so it's
+  # handled here instead of relying on every caller to check first.
+  if (!is.data.frame(metadata_cache$cache$mediaMetaData)) {
+    return(metadata_cache)
+  }
+
   annos_to_add <- metadata_cache$cache$annotations[
     metadata_cache$cache$annotations$is_add == 1,
   ]

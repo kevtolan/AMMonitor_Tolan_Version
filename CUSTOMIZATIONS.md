@@ -293,6 +293,69 @@ since they share a calling convention:
 
 - Wires `audio_comment_box_ui()` into all four Audio sub-tabs.
 
+### `server.R`
+
+- Fixed a fatal regression from the `audio_avail`/`photos_avail`
+  `ignoreInit = TRUE` fix above: the "run once when this tab is first
+  opened" blocks (one per Photos/Audio sub-tab, e.g.
+  `audio_model_verifier_loaded`) gated *when* they first proceeded past
+  their `req()`, but nothing stopped them from running *again* later if
+  Shiny re-triggered the observer -- which re-called
+  `annotation_viewer_tables_server()`/`audio_player_server()` /
+  `image_viewer_server()` a second time with the same module id
+  (unsupported by `moduleServer()`), surfacing as `object
+  '..._player_output' not found` elsewhere in the app. Restructured each
+  to `req(isolate(loaded_flag()) == FALSE)` so every run after the first
+  is a true no-op.
+
+### `modules/media_tools/audio_player.R` and `modules/media_tools/image_viewer.R`
+
+- Fixed the actual root cause of the above regression report (a second,
+  independent bug, not the `server.R` one): a **top-level** `if
+  (isolate(nrow(audio_avail())) != 0) { ... }` /
+  `if (isolate(nrow(photos_avail())) != 0) { ... }` ran once, eagerly,
+  during each module's own setup (not inside any `observe()`/`reactive()`
+  wrapper) to sync the date-range filter if the recording list already had
+  data at startup. Since `audio_avail()`/`photos_avail()` no longer load
+  anything until Apply Filters is pressed, this now *always* reads an
+  eventReactive that has never fired, which throws a `shiny.silent.error`
+  (same condition class `req(FALSE)` raises) -- and because this code sat
+  outside any reactive wrapper, nothing caught it: it aborted
+  `audio_player_server()`/`image_viewer_server()`'s entire setup call
+  before it returned, which is what left `..._player_output` undefined
+  for every downstream module that referenced it. Removed the now-dead
+  block entirely (the equivalent logic inside the `observeEvent` right
+  below it already handles the meaningful case -- updating the date range
+  when the user picks a new location -- safely, since `observeEvent` has
+  its own silent-error boundary).
+- Also hardened the two "Update the metadata cache" blocks' `nrow(...) !=
+  0` checks with a preceding `is.data.frame(...)` check:
+  `nrow(metadata_cache$cache$mediaMetaData)` is `NULL` (not `0`) while the
+  cache is unpopulated, so `NULL != 0` is `logical(0)` -- which does not
+  reliably short-circuit the rest of the `&&` chain and could still reach
+  a `[` subset against the cache's other still-NA placeholder fields,
+  throwing "incorrect number of dimensions". `is.data.frame(NA)` is a
+  clean `FALSE`, which `&&` does short-circuit on.
+- (audio only) `metadata_cache`'s `i_cache_start`/`i_cache_end` now
+  default to `1`/`0` (an empty range) instead of `NA`, for the same
+  reason: an unguarded `if (i_audio() < i_cache_start || i_audio() >
+  i_cache_end)` elsewhere threw "missing value where TRUE/FALSE needed"
+  as soon as anything read `i_audio()` before the cache populated.
+  `i_cache_end` already doubles as an "is the cache populated yet" flag
+  elsewhere (`i_cache_end != 0`), so `0` is the semantically correct
+  empty-state value. Same fix applied to `image_viewer.R`'s copy.
+- `save_metadata_cache()` (in `save_metadata_cache.R`, shared by both
+  files) now returns immediately if `metadata_cache$cache$mediaMetaData`
+  isn't a data.frame yet, guarding a call site
+  (`audio_player.R`/`image_viewer.R`'s `save_metadata_now` observer) that
+  had no other check before unconditionally trying to flush the cache.
+- All of the above were found and fixed by actually launching the app
+  (`launchApp()` against the trial database) and reproducing the crash in
+  a browser after every candidate fix, rather than reasoning about the
+  reactive graph in the abstract -- the first two fixes attempted (before
+  the top-level `isolate(audio_avail())` block was found) resolved
+  different, real, but insufficient parts of the failure.
+
 ## Related database schema changes (not in this repo)
 
 Live SQLite schema changes needed for the above, made via
