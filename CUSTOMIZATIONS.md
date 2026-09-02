@@ -74,6 +74,14 @@ since they share a calling convention:
 
 ## Bug fixes to existing package functions
 
+- **`inst/shiny/modules/app_modules/registerVisitUpdateDB.R`** -- the
+  AudioMoth-metadata timezone lookup built its `SELECT tz FROM locations
+  WHERE pk_locationid = '...'` query via raw string concatenation, so a
+  location name containing an apostrophe (e.g. "Smith's Field") broke the
+  SQL and threw `near "s": syntax error`, blocking Add Visit entirely for
+  audio at that location. Switched to a parameterized query
+  (`params = list(...)`), which also closes the door on this for any
+  future location/site name with a quote in it.
 - **`R/scoresDetect.R`** -- `scoreThresholds` was matched by name against
   template names; an unnamed vector (`names(scoreThresholds)` is `NULL`)
   matched nothing and was silently ignored -- no error, no warning, the

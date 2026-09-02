@@ -246,10 +246,8 @@ registerVisitUpdateDB_server <- function(id, mediaType, visitMetadata, screenDat
         if (mediaType() == "audio") {
           location_tz <- dbGetQuery(
             con(),
-            paste0(
-              "SELECT tz FROM locations WHERE pk_locationid = '",
-              visitMetadata()$fk_locationid, "';"
-            )
+            "SELECT tz FROM locations WHERE pk_locationid = ?;",
+            params = list(visitMetadata()$fk_locationid)
           )[1, "tz"]
           if (is.na(location_tz) || location_tz == "") location_tz <- "UTC"
 
