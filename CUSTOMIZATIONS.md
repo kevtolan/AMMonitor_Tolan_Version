@@ -77,6 +77,18 @@ since they share a calling convention:
 
 ## Bug fixes to existing package functions
 
+- **`inst/shiny/modules/app_modules/registerVisitUpdateDB.R`** -- the
+  AudioMoth WAV comment parser only recognized one narrow comment format
+  and silently produced all-NA metadata for anything else. Real AudioMoth
+  firmware comment text varies (see
+  [metamoth's firmware history](https://metamoth.readthedocs.io/en/latest/firmwares.html)):
+  "gain" vs. "gain setting", "battery was" vs. "battery state was", an
+  optional timezone offset in the UTC parenthetical, no temperature field
+  on older firmware, and -- most significantly -- firmware 1.5.0+ replaces
+  the "by AudioMoth &lt;serial&gt;" clause entirely with "during deployment
+  &lt;id&gt;" when a deployment ID is configured, rather than adding to it.
+  Reworked the regex to accept all of these; verified against real
+  documented comment strings for each variant.
 - **`inst/shiny/modules/app_modules/registerVisitUpdateDB.R`** -- adding
   media to a *pre-existing* visit crashed immediately on `Add the new
   visit`: the status-message builder referenced `rs$message`, but `rs` is

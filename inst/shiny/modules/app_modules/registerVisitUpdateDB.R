@@ -38,28 +38,40 @@ registerVisit_parse_icmt <- function(raw_bytes) {
   rawToChar(txt_bytes)
 }
 
-# AudioMoth comment format:
-# "Recorded at 02:00:00 07/04/2026 (UTC) by AudioMoth 24F319075F7DF877 at medium
-#  gain while battery was 4.0V and temperature was 0.9C."
+# AudioMoth comment format varies by firmware version (see
+# https://metamoth.readthedocs.io/en/latest/firmwares.html) -- this pattern
+# tolerates the known variations:
+#  - timezone shown as "(UTC)" or with an offset, e.g. "(UTC+05:30)"
+#  - "by AudioMoth <serial>" (normal) OR "during deployment <id>" (when a
+#    deployment ID is configured -- firmware 1.5.0+ replaces the serial
+#    clause with this instead of adding to it)
+#  - "<gain> gain" or "<gain> gain setting"
+#  - "battery was" or "battery state was"
+#  - a trailing "and temperature was <N>C" clause, absent on older firmware
+# Examples this matches:
+# "Recorded at 02:00:00 07/04/2026 (UTC) by AudioMoth 24F319075F7DF877 at medium gain while battery was 4.0V and temperature was 0.9C."
+# "Recorded at 13:16:00 28/05/2021 (UTC) during deployment 94DB49FDC0B963A6 at medium gain setting while battery state was 4.7V and temperature was 22.9C."
+# "Recorded at 04:00:00 04/06/2020 (UTC) by AudioMoth 0F48A1424F413A9E at low gain while battery state was 4.4V."
 registerVisit_audiomoth_pattern <- paste0(
-  "Recorded at (\\d{2}:\\d{2}:\\d{2}) (\\d{2}/\\d{2}/\\d{4}) \\(UTC\\) ",
-  "by AudioMoth ([0-9A-Fa-f]+) ",
-  "at ([A-Za-z\\-]+) gain ",
-  "while battery was ([0-9.]+)V ",
-  "and temperature was (-?[0-9.]+)C\\."
+  "Recorded at (\\d{2}:\\d{2}:\\d{2}) (\\d{2}/\\d{2}/\\d{4}) \\(UTC[^)]*\\)\\s*",
+  "(?:by AudioMoth ([0-9A-Fa-f]+)|during deployment ([0-9A-Fa-f]+)) ",
+  "at ([A-Za-z\\-]+) gain(?: setting)? ",
+  "while battery(?: state)? was ([0-9.]+)V",
+  "(?:\\s+and temperature was (-?[0-9.]+)C)?",
+  "\\."
 )
 
 registerVisit_parse_audiomoth_comment <- function(comment) {
   if (is.na(comment)) return(NULL)
-  m <- regmatches(comment, regexec(registerVisit_audiomoth_pattern, comment))[[1]]
-  if (length(m) != 7) return(NULL)  # didn't match -- not an AudioMoth comment we recognize
+  m <- regmatches(comment, regexec(registerVisit_audiomoth_pattern, comment, perl = TRUE))[[1]]
+  if (length(m) != 8) return(NULL)  # didn't match -- not an AudioMoth comment we recognize
   list(
     time_str = m[2],
     date_str = m[3],
-    device_serial = m[4],
-    gain_setting = m[5],
-    battery_voltage = as.numeric(m[6]),
-    temperature_c = as.numeric(m[7])
+    device_serial = if (m[4] != "") m[4] else m[5],
+    gain_setting = m[6],
+    battery_voltage = as.numeric(m[7]),
+    temperature_c = if (m[8] != "") as.numeric(m[8]) else NA_real_
   )
 }
 
