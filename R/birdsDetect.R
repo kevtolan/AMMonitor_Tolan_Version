@@ -226,8 +226,7 @@ birdsDetect <- function(
     chunk_processed <- 0
     for (i in seq_len(nrow(chunk_media))) {
       if (showProgress) {
-        cat("Recording", idx[i], "of", nrow(media), "\n")
-        cat(chunk_media$filename[i], "\n")
+        cat(idx[i], "/", nrow(media), " ", chunk_media$filename[i], "\n", sep = "")
       }
       out <- process_one_recording(
         chunk_media$pk_mediaid[i], chunk_media$filename[i], chunk_media$filepath[i], chunk_model
