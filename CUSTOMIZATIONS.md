@@ -77,6 +77,12 @@ since they share a calling convention:
 
 ## Bug fixes to existing package functions
 
+- **`inst/shiny/modules/app_modules/registerVisitUpdateDB.R`** -- adding
+  media to a *pre-existing* visit crashed immediately on `Add the new
+  visit`: the status-message builder referenced `rs$message`, but `rs` is
+  only ever assigned in the *other* branch (creating a brand-new visit).
+  Selecting an existing visit hit an undefined-variable error before any
+  media could be added. Removed the stray reference.
 - **`inst/shiny/modules/app_modules/registerVisitUpdateDB.R`** -- the
   AudioMoth-metadata timezone lookup built its `SELECT tz FROM locations
   WHERE pk_locationid = '...'` query via raw string concatenation, so a

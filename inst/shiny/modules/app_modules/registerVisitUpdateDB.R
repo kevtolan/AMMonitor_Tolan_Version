@@ -147,9 +147,8 @@ registerVisitUpdateDB_server <- function(id, mediaType, visitMetadata, screenDat
         newVisitID <- visitMetadata()$pk_visitid
         statusText(
           paste(
-            statusText(), 
+            statusText(),
             paste('Existing visit selected:', newVisitID),
-            rs$message,
             sep = '\n'
           )
         )
