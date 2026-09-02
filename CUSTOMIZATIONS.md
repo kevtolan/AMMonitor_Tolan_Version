@@ -56,6 +56,11 @@ since they share a calling convention:
   summary: recordings processed, total audio duration, elapsed wall-clock
   time, throughput, and how many times faster than real-time the analysis
   ran. Also returned invisibly for programmatic use.
+- **`birdsDetect()` start-time banner** -- when `showProgress = TRUE`,
+  prints `Starting birdsDetect() at <timestamp>` as the very first thing
+  the function does (before even the `birdnetR` install check), so a long
+  run's start time is visible at the top of the console output rather
+  than only inferable from the final speed summary.
 - **`birdsDetect()` progress output** -- prints an "M/N filename" line
   after each recording finishes, when `showProgress = TRUE`, where M is a
   running count of recordings *completed so far* (shared across all

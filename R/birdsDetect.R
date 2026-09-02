@@ -80,6 +80,10 @@ birdsDetect <- function(
     numCores = 1
 ) {
 
+  if (showProgress) {
+    cli::cli_alert_info("Starting birdsDetect() at {format(Sys.time(), '%Y-%m-%d %H:%M:%S')}")
+  }
+
   if (!requireNamespace("birdnetR", quietly = TRUE)) {
     stop("Package 'birdnetR' is required. Install with install.packages('birdnetR').")
   }
