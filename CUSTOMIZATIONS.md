@@ -62,12 +62,18 @@ since they share a calling convention:
   progress bar, when `showProgress = TRUE`. The bar itself
   (`Predicting species: 100%|...`) comes from `birdnetR`'s Python internals
   and has no exposed hook to prefix or customize it, so this is the
-  closest a recording-position indicator can get to that line. Uses
-  `message()` (stderr) rather than `cat()` (stdout): under `numCores > 1`
-  this runs inside a forked `mclapply()` worker, and RStudio's console
-  frequently doesn't surface stdout from forked children -- only stderr,
-  which is also where the tqdm bar writes, so this keeps both visible
-  together instead of the "X/N" line silently vanishing.
+  closest a recording-position indicator can get to that line. Writes by
+  opening `"/dev/stderr"` by its literal path (Unix only) rather than
+  `cat()`/`message()` to R's `stdout()`/`stderr()` connections: under
+  `numCores > 1` this runs inside a forked `mclapply()` worker, and in
+  RStudio neither `cat()` nor `message()` from a forked child ever reaches
+  the console -- both go through R's own connection/callback layer, which
+  only the main (non-forked) session is wired up to. BirdNET's Python tqdm
+  bar shows up fine because it writes straight to the OS file descriptor
+  with no R connection involved; opening `/dev/stderr` by path does the
+  same raw write from R's side, bypassing R's connection layer entirely.
+  Falls back to `message()` on non-Unix (where forking -- and thus this
+  problem -- doesn't happen anyway).
 - **Multicore support (`numCores` argument)** -- both functions accept
   `numCores`; when > 1, recordings are split into that many chunks and
   processed concurrently via `parallel::mclapply` (fork-based, Unix/macOS

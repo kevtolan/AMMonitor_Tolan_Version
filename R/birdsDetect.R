@@ -242,12 +242,24 @@ birdsDetect <- function(
     chunk_processed <- 0
     for (i in seq_len(nrow(chunk_media))) {
       if (showProgress) {
-        # message() (stderr) rather than cat() (stdout): under numCores > 1,
-        # this runs inside a forked mclapply() worker, and RStudio's console
-        # frequently doesn't surface stdout from forked children -- only
-        # stderr, which is also where BirdNET's own tqdm bar writes, so this
-        # keeps both visible together.
-        message(idx[i], "/", nrow(media), " ", chunk_media$filename[i])
+        # Neither cat() nor message() (tried previously) show up here under
+        # numCores > 1: both go through R's own stdout/stderr *connection*
+        # objects, which in RStudio are wired to a console-output callback
+        # that only the main (non-forked) session is hooked up to -- a
+        # forked mclapply() worker calling message() just gets silently
+        # dropped there, even on stderr. BirdNET's own tqdm bar (from
+        # Python, via reticulate) shows up fine because it writes straight
+        # to the OS-level file descriptor with no R connection involved at
+        # all. Opening "/dev/stderr" *by its literal path* (Unix only, but
+        # mclapply forking already is) does the same thing from R's side --
+        # a raw write() to fd 2 that bypasses R's connection/callback layer
+        # entirely -- so it shows up in RStudio the same way the tqdm bar
+        # does.
+        if (.Platform$OS.type == "unix") {
+          cat(idx[i], "/", nrow(media), " ", chunk_media$filename[i], "\n", sep = "", file = "/dev/stderr")
+        } else {
+          message(idx[i], "/", nrow(media), " ", chunk_media$filename[i])
+        }
       }
       out <- process_one_recording(
         chunk_media$pk_mediaid[i], chunk_media$filename[i], chunk_media$filepath[i], chunk_model
