@@ -62,7 +62,12 @@ since they share a calling convention:
   progress bar, when `showProgress = TRUE`. The bar itself
   (`Predicting species: 100%|...`) comes from `birdnetR`'s Python internals
   and has no exposed hook to prefix or customize it, so this is the
-  closest a recording-position indicator can get to that line.
+  closest a recording-position indicator can get to that line. Uses
+  `message()` (stderr) rather than `cat()` (stdout): under `numCores > 1`
+  this runs inside a forked `mclapply()` worker, and RStudio's console
+  frequently doesn't surface stdout from forked children -- only stderr,
+  which is also where the tqdm bar writes, so this keeps both visible
+  together instead of the "X/N" line silently vanishing.
 - **Multicore support (`numCores` argument)** -- both functions accept
   `numCores`; when > 1, recordings are split into that many chunks and
   processed concurrently via `parallel::mclapply` (fork-based, Unix/macOS

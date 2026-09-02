@@ -226,7 +226,12 @@ birdsDetect <- function(
     chunk_processed <- 0
     for (i in seq_len(nrow(chunk_media))) {
       if (showProgress) {
-        cat(idx[i], "/", nrow(media), " ", chunk_media$filename[i], "\n", sep = "")
+        # message() (stderr) rather than cat() (stdout): under numCores > 1,
+        # this runs inside a forked mclapply() worker, and RStudio's console
+        # frequently doesn't surface stdout from forked children -- only
+        # stderr, which is also where BirdNET's own tqdm bar writes, so this
+        # keeps both visible together.
+        message(idx[i], "/", nrow(media), " ", chunk_media$filename[i])
       }
       out <- process_one_recording(
         chunk_media$pk_mediaid[i], chunk_media$filename[i], chunk_media$filepath[i], chunk_model
