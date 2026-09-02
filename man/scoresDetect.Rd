@@ -27,12 +27,17 @@ by name which recordings should be processed. Default is 'all'.}
 \item{templateNames}{Default = 'all'. An optional character vector specifying
 which templates to use for searching recordings.}
 
-\item{scoreThresholds}{Optional named numeric vector of score thresholds to
-use for binary point matching or spectrogram cross correlation templates,
-ordered according to inputs to the templateID or listID argument. If using
-\code{templateID = 'all'}, please check the current ordering of templates in
-your database to ensure you are providing the correct score thresholds to the
-templateNames you intend. If no value is entered for scoreThresholds, all
+\item{scoreThresholds}{Optional score threshold(s) to use for binary point
+matching or spectrogram cross correlation templates, in any of three
+forms: a single number, applied as a blanket threshold to every template;
+a named numeric vector (names matching template names, e.g.
+\code{names(scoreThresholds) <- names(templates@models)}), applied by
+name; or an unnamed numeric vector with exactly one value per template,
+applied by position in the order \code{monitoR::templateNames()} reports
+(binary templates first, then correlation templates). Any name that
+doesn't match a template, or a vector whose length matches neither one
+template nor the total template count, is ignored with a warning rather
+than silently dropped. If no value is entered for scoreThresholds, all
 template score thresholds will be automatically extracted from the internals
 of the monitoR templateList object -- please check to ensure these are the
 score thresholds you actually want to use.}

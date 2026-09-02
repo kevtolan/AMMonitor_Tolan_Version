@@ -15,12 +15,17 @@
 #' by name which recordings should be processed. Default is 'all'.
 #' @param templateNames Default = 'all'. An optional character vector specifying
 #' which templates to use for searching recordings.
-#' @param scoreThresholds Optional named numeric vector of score thresholds to
-#' use for binary point matching or spectrogram cross correlation templates,
-#' ordered according to inputs to the templateID or listID argument. If using
-#' \code{templateID = 'all'}, please check the current ordering of templates in
-#' your database to ensure you are providing the correct score thresholds to the
-#' templateNames you intend. If no value is entered for scoreThresholds, all
+#' @param scoreThresholds Optional score threshold(s) to use for binary point
+#' matching or spectrogram cross correlation templates, in any of three
+#' forms: a single number, applied as a blanket threshold to every template;
+#' a named numeric vector (names matching template names, e.g.
+#' \code{names(scoreThresholds) <- names(templates@models)}), applied by
+#' name; or an unnamed numeric vector with exactly one value per template,
+#' applied by position in the order \code{monitoR::templateNames()} reports
+#' (binary templates first, then correlation templates). Any name that
+#' doesn't match a template, or a vector whose length matches neither one
+#' template nor the total template count, is ignored with a warning rather
+#' than silently dropped. If no value is entered for scoreThresholds, all
 #' template score thresholds will be automatically extracted from the internals
 #' of the monitoR templateList object -- please check to ensure these are the
 #' score thresholds you actually want to use.
@@ -156,11 +161,41 @@ scoresDetect <- function(
     stop("No templates were found in the AMMonitor model libraries.")
   }
 
-  # Assign new score thresholds (if given)
+  # Assign new score thresholds (if given). Accepts:
+  #  - a single unnamed number -- applied as a blanket threshold to every
+  #    template (bin and cor alike);
+  #  - a named vector -- matched by name against template names, same as
+  #    before (unmatched names are dropped, with a warning);
+  #  - an unnamed vector with exactly one value per template -- applied by
+  #    position, in the order templateNames() reports (bin templates then
+  #    cor templates).
   if (any(!is.na(scoreThresholds))) {
+    all_template_names <- c(
+      if (!is.null(binTemplates)) monitoR::templateNames(binTemplates),
+      if (!is.null(corTemplates)) monitoR::templateNames(corTemplates)
+    )
+
+    is_named <- !is.null(names(scoreThresholds)) && !any(names(scoreThresholds) == "")
+
+    if (!is_named && length(scoreThresholds) == 1) {
+      scoreThresholds <- stats::setNames(rep(scoreThresholds, length(all_template_names)), all_template_names)
+    } else if (!is_named && length(scoreThresholds) == length(all_template_names)) {
+      scoreThresholds <- stats::setNames(scoreThresholds, all_template_names)
+    } else if (!is_named) {
+      warning(
+        "scoreThresholds has ", length(scoreThresholds), " unnamed value(s) but there ",
+        "are ", length(all_template_names), " template(s) (", paste(all_template_names, collapse = ", "), "). ",
+        "Provide a single number (applied to every template), a named vector (names ",
+        "matching template names), or an unnamed vector with exactly one value per ",
+        "template in that order. No thresholds were applied.",
+        call. = FALSE
+      )
+      scoreThresholds <- stats::setNames(numeric(0), character(0))
+    }
+
     if (!is.null(binTemplates)) {
       binScores <- scoreThresholds[which(names(scoreThresholds) %in% monitoR::templateNames(binTemplates))]
-      
+
       if (length(binScores) > 0) {
         monitoR::templateCutoff(binTemplates) <- binScores
       }
@@ -171,6 +206,15 @@ scoresDetect <- function(
       if (length(corScores) > 0) {
         monitoR::templateCutoff(corTemplates) <- corScores
       }
+    }
+
+    unmatched <- setdiff(names(scoreThresholds), all_template_names)
+    if (length(unmatched) > 0) {
+      warning(
+        "scoreThresholds name(s) not found among templates and ignored: ",
+        paste(unmatched, collapse = ", "), " (known templates: ", paste(all_template_names, collapse = ", "), ").",
+        call. = FALSE
+      )
     }
   }
 

@@ -74,6 +74,17 @@ since they share a calling convention:
 
 ## Bug fixes to existing package functions
 
+- **`R/scoresDetect.R`** -- `scoreThresholds` was matched by name against
+  template names; an unnamed vector (`names(scoreThresholds)` is `NULL`)
+  matched nothing and was silently ignored -- no error, no warning, the
+  function just ran with the templates' own built-in cutoffs instead.
+  Reworked to accept three forms: a single number (applied to every
+  template), a named vector (matched by name, as before), or an unnamed
+  vector with exactly one value per template (applied by position, in
+  `monitoR::templateNames()` order -- matching what the original
+  docs already claimed but the code never actually did). Any name that
+  doesn't match a template, or a vector of some other length, now warns
+  explicitly instead of failing silently.
 - **`R/birdsDetect.R`** -- recordings whose filename contains a space
   produced an S3 URL with a literal unescaped space, which `download.file()` can't fetch (fails
   silently, surfaced as "Could not access recording"). Fixed by
