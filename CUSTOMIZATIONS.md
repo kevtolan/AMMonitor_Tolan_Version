@@ -56,24 +56,35 @@ since they share a calling convention:
   summary: recordings processed, total audio duration, elapsed wall-clock
   time, throughput, and how many times faster than real-time the analysis
   ran. Also returned invisibly for programmatic use.
-- **`birdsDetect()` progress output** -- prints an "X/N filename" line
-  (X being the recording's true position in the full requested set, even
-  when split across parallel workers) directly above each file's BirdNET
-  progress bar, when `showProgress = TRUE`. The bar itself
-  (`Predicting species: 100%|...`) comes from `birdnetR`'s Python internals
-  and has no exposed hook to prefix or customize it, so this is the
-  closest a recording-position indicator can get to that line. Writes by
-  opening `"/dev/stderr"` by its literal path (Unix only) rather than
+- **`birdsDetect()` progress output** -- prints an "M/N filename" line
+  after each recording finishes, when `showProgress = TRUE`, where M is a
+  running count of recordings *completed so far* (shared across all
+  workers), not that recording's position in the requested list. An
+  earlier version reported position instead; under `numCores > 1` that
+  printed out of order (e.g. `1, 4, 6, 9, ...` -- the first index of each
+  worker's own chunk) since independent workers finish at their own pace,
+  which read as broken even though each number was individually correct.
+  The completed-count is tracked via a shared temp file every worker
+  appends one line to per finished recording (`file.create()`'d before
+  `mclapply`, cleaned up via `on.exit()`); a worker's reported M is
+  `length(readLines(...))` right after its own append. A single small
+  append (one line, well under `PIPE_BUF`) is an atomic write on POSIX, so
+  concurrent workers can't corrupt each other's entries without explicit
+  locking -- verified under 8 concurrent workers: correct total, no
+  corruption, occasional duplicate/skipped M by 1 from the unlocked
+  read-after-append race, acceptable for a cosmetic progress line. Prints
+  by opening `"/dev/stderr"` by its literal path (Unix only) rather than
   `cat()`/`message()` to R's `stdout()`/`stderr()` connections: under
   `numCores > 1` this runs inside a forked `mclapply()` worker, and in
   RStudio neither `cat()` nor `message()` from a forked child ever reaches
   the console -- both go through R's own connection/callback layer, which
   only the main (non-forked) session is wired up to. BirdNET's Python tqdm
-  bar shows up fine because it writes straight to the OS file descriptor
-  with no R connection involved; opening `/dev/stderr` by path does the
-  same raw write from R's side, bypassing R's connection layer entirely.
-  Falls back to `message()` on non-Unix (where forking -- and thus this
-  problem -- doesn't happen anyway).
+  bar (`Predicting species: 100%|...`) shows up fine because it writes
+  straight to the OS file descriptor with no R connection involved;
+  opening `/dev/stderr` by path does the same raw write from R's side,
+  bypassing R's connection layer entirely. Falls back to `message()` on
+  non-Unix (where forking -- and thus this problem -- doesn't happen
+  anyway).
 - **Multicore support (`numCores` argument)** -- both functions accept
   `numCores`; when > 1, recordings are split into that many chunks and
   processed concurrently via `parallel::mclapply` (fork-based, Unix/macOS

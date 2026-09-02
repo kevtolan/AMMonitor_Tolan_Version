@@ -226,6 +226,22 @@ birdsDetect <- function(
     list(result = result, duration = dur_sec)
   }
 
+  # ---- Shared progress ticker ----
+  # A recording's position in the originally-requested list (used by an
+  # earlier version of this progress line) isn't reported in order once
+  # numCores > 1 splits the list across independent workers -- each worker
+  # runs at its own pace, so e.g. worker 3's first recording can print
+  # before worker 1's second one. A shared ticker file that every worker
+  # appends one line to as it finishes each recording gives a genuinely
+  # increasing "M of N done" count instead. A single small append (one
+  # line, well under PIPE_BUF) is an atomic write on POSIX, so concurrent
+  # workers can't corrupt each other's entries without explicit locking.
+  ticker_file <- if (showProgress) tempfile() else NULL
+  if (showProgress) {
+    file.create(ticker_file)
+    on.exit(unlink(ticker_file), add = TRUE)
+  }
+
   # ---- Process one chunk of recordings (a "worker") ----
   # Each parallel worker loads its own model rather than reusing the
   # parent's, since a loaded TensorFlow Lite interpreter (with its own
@@ -241,9 +257,21 @@ birdsDetect <- function(
     chunk_duration <- 0
     chunk_processed <- 0
     for (i in seq_len(nrow(chunk_media))) {
+      out <- process_one_recording(
+        chunk_media$pk_mediaid[i], chunk_media$filename[i], chunk_media$filepath[i], chunk_model
+      )
+      if (!is.na(out$duration)) {
+        chunk_duration <- chunk_duration + out$duration
+        chunk_processed <- chunk_processed + 1
+      }
+      if (!is.null(out$result)) {
+        chunk_results[[i]] <- out$result
+      }
       if (showProgress) {
-        # Neither cat() nor message() (tried previously) show up here under
-        # numCores > 1: both go through R's own stdout/stderr *connection*
+        cat("x\n", file = ticker_file, append = TRUE)
+        completed <- length(readLines(ticker_file, warn = FALSE))
+        # Neither cat() nor message() to R's usual stdout()/stderr() show up
+        # here under numCores > 1: both go through R's own connection
         # objects, which in RStudio are wired to a console-output callback
         # that only the main (non-forked) session is hooked up to -- a
         # forked mclapply() worker calling message() just gets silently
@@ -256,20 +284,10 @@ birdsDetect <- function(
         # entirely -- so it shows up in RStudio the same way the tqdm bar
         # does.
         if (.Platform$OS.type == "unix") {
-          cat(idx[i], "/", nrow(media), " ", chunk_media$filename[i], "\n", sep = "", file = "/dev/stderr")
+          cat(completed, "/", nrow(media), " ", chunk_media$filename[i], "\n", sep = "", file = "/dev/stderr")
         } else {
-          message(idx[i], "/", nrow(media), " ", chunk_media$filename[i])
+          message(completed, "/", nrow(media), " ", chunk_media$filename[i])
         }
-      }
-      out <- process_one_recording(
-        chunk_media$pk_mediaid[i], chunk_media$filename[i], chunk_media$filepath[i], chunk_model
-      )
-      if (!is.na(out$duration)) {
-        chunk_duration <- chunk_duration + out$duration
-        chunk_processed <- chunk_processed + 1
-      }
-      if (!is.null(out$result)) {
-        chunk_results[[i]] <- out$result
       }
     }
     list(results = do.call(rbind, chunk_results), duration = chunk_duration, processed = chunk_processed)
