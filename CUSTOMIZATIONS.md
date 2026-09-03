@@ -4,7 +4,13 @@ This fork carries local changes on top of upstream AMMonitor `AMMonitor2.2`
 (commit `585b4a79`), maintained at
 [code.usgs.gov/vtcfwru/ammonitor](https://code.usgs.gov/vtcfwru/ammonitor/-/tree/master).
 Changes fall into three groups: new package functions (`R/`), the Shiny app
-(`inst/shiny/`), and bug fixes to existing package functions. This documented was generated using AI.
+(`inst/shiny/`), and bug fixes to existing (pre-fork) code in either. New
+functions are documented by what they do now, not by their own development
+history -- an issue found and corrected while building a new function isn't
+a "bug fix" in the sense used here, since the function never shipped in a
+broken state to begin with.
+
+This document was generated using AI.
 
 ## New package functions -- BirdNET integration
 
@@ -17,8 +23,9 @@ CSV-import workflow (`import_birdnet.R`).
   Mirrors `scoresDetect()`'s calling convention (`con`/`recordingNames`/
   `dbInsert`/`showProgress`). Supports a managed species list
   (`speciesList`/`speciesListPath`) to restrict detections to expected
-  regional species; recordings hosted remotely (S3, etc.) are downloaded to
-  a temp file for analysis.
+  regional species; recordings hosted remotely (S3, etc.) are downloaded
+  to a temp file for analysis, URL-encoding the remote path first so a
+  filename containing a space downloads correctly.
 - **`R/birdSpeciesList.R`** -- `birdSpeciesList()`, `birdSpeciesAdd()`,
   `birdSpeciesRemove()`: manage a plain-text CSV species list used by
   `birdsDetect()`'s species filter.
@@ -61,35 +68,28 @@ since they share a calling convention:
   the function does (before even the `birdnetR` install check), so a long
   run's start time is visible at the top of the console output rather
   than only inferable from the final speed summary.
-- **`birdsDetect()` progress output** -- prints an "M/N filename" line
-  after each recording finishes, when `showProgress = TRUE`, where M is a
-  running count of recordings *completed so far* (shared across all
-  workers), not that recording's position in the requested list. An
-  earlier version reported position instead; under `numCores > 1` that
-  printed out of order (e.g. `1, 4, 6, 9, ...` -- the first index of each
-  worker's own chunk) since independent workers finish at their own pace,
-  which read as broken even though each number was individually correct.
-  The completed-count is tracked via a shared temp file every worker
-  appends one line to per finished recording (`file.create()`'d before
-  `mclapply`, cleaned up via `on.exit()`); a worker's reported M is
+- **`birdsDetect()` progress output** -- when `showProgress = TRUE`,
+  prints an "M/N filename" line as each recording finishes, where M is a
+  running count of recordings completed so far across all workers (a
+  recording's position in the requested list isn't used, since that
+  doesn't print in a useful order once the list is split across parallel
+  workers). The completed-count is tracked via a shared temp file every
+  worker appends one line to per finished recording (`file.create()`'d
+  before `mclapply`, cleaned up via `on.exit()`); a worker's reported M is
   `length(readLines(...))` right after its own append. A single small
   append (one line, well under `PIPE_BUF`) is an atomic write on POSIX, so
-  concurrent workers can't corrupt each other's entries without explicit
-  locking -- verified under 8 concurrent workers: correct total, no
-  corruption, occasional duplicate/skipped M by 1 from the unlocked
-  read-after-append race, acceptable for a cosmetic progress line. Prints
-  by opening `"/dev/stderr"` by its literal path (Unix only) rather than
-  `cat()`/`message()` to R's `stdout()`/`stderr()` connections: under
-  `numCores > 1` this runs inside a forked `mclapply()` worker, and in
-  RStudio neither `cat()` nor `message()` from a forked child ever reaches
-  the console -- both go through R's own connection/callback layer, which
-  only the main (non-forked) session is wired up to. BirdNET's Python tqdm
-  bar (`Predicting species: 100%|...`) shows up fine because it writes
-  straight to the OS file descriptor with no R connection involved;
-  opening `/dev/stderr` by path does the same raw write from R's side,
-  bypassing R's connection layer entirely. Falls back to `message()` on
-  non-Unix (where forking -- and thus this problem -- doesn't happen
-  anyway).
+  concurrent workers don't corrupt each other's entries without needing
+  explicit locking. Prints by opening `"/dev/stderr"` by its literal path
+  (Unix only) rather than through R's own `stdout()`/`stderr()`
+  connections, since under `numCores > 1` this runs inside a forked
+  `mclapply()` worker, and in RStudio neither `cat()` nor `message()` from
+  a forked child reaches the console (both go through R's
+  connection/callback layer, which only the main session is wired up to).
+  BirdNET's Python tqdm bar (`Predicting species: 100%|...`) shows up fine
+  because it writes straight to the OS file descriptor with no R
+  connection involved; opening `/dev/stderr` by path does the same raw
+  write from R's side. Falls back to `message()` on non-Unix (where
+  forking doesn't happen anyway).
 - **Multicore support (`numCores` argument)** -- both functions accept
   `numCores`; when > 1, recordings are split into that many chunks and
   processed concurrently via `parallel::mclapply` (fork-based, Unix/macOS
@@ -153,10 +153,6 @@ since they share a calling convention:
   docs already claimed but the code never actually did). Any name that
   doesn't match a template, or a vector of some other length, now warns
   explicitly instead of failing silently.
-- **`R/birdsDetect.R`** -- recordings whose filename contains a space
-  produced an S3 URL with a literal unescaped space, which `download.file()` can't fetch (fails
-  silently, surfaced as "Could not access recording"). Fixed by
-  URL-encoding the remote path before download.
 - **`inst/shiny/modules/app_modules/registerVisitUpdateDB.R`** -- media
   uploaded to the root of an S3 bucket (no subfolder) got a double slash in
   its stored `filepath` (e.g. `https://bucket.s3.amazonaws.com//file.WAV`),
