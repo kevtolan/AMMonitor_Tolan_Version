@@ -112,32 +112,12 @@ since they share a calling convention:
 
 ## Bug fixes to existing package functions
 
-- **`inst/shiny/modules/app_modules/registerVisitUpdateDB.R`** -- the
-  AudioMoth WAV comment parser only recognized one narrow comment format
-  and silently produced all-NA metadata for anything else. Real AudioMoth
-  firmware comment text varies (see
-  [metamoth's firmware history](https://metamoth.readthedocs.io/en/latest/firmwares.html)):
-  "gain" vs. "gain setting", "battery was" vs. "battery state was", an
-  optional timezone offset in the UTC parenthetical, no temperature field
-  on older firmware, and -- most significantly -- firmware 1.5.0+ replaces
-  the "by AudioMoth &lt;serial&gt;" clause entirely with "during deployment
-  &lt;id&gt;" when a deployment ID is configured, rather than adding to it.
-  Reworked the regex to accept all of these; verified against real
-  documented comment strings for each variant.
 - **`inst/shiny/modules/app_modules/registerVisitUpdateDB.R`** -- adding
   media to a *pre-existing* visit crashed immediately on `Add the new
   visit`: the status-message builder referenced `rs$message`, but `rs` is
   only ever assigned in the *other* branch (creating a brand-new visit).
   Selecting an existing visit hit an undefined-variable error before any
   media could be added. Removed the stray reference.
-- **`inst/shiny/modules/app_modules/registerVisitUpdateDB.R`** -- the
-  AudioMoth-metadata timezone lookup built its `SELECT tz FROM locations
-  WHERE pk_locationid = '...'` query via raw string concatenation, so a
-  location name containing an apostrophe (e.g. "Smith's Field") broke the
-  SQL and threw `near "s": syntax error`, blocking Add Visit entirely for
-  audio at that location. Switched to a parameterized query
-  (`params = list(...)`), which also closes the door on this for any
-  future location/site name with a quote in it.
 - **`R/scoresDetect.R`** -- `scoreThresholds` was matched by name against
   template names; an unnamed vector (`names(scoreThresholds)` is `NULL`)
   matched nothing and was silently ignored -- no error, no warning, the
@@ -272,7 +252,19 @@ since they share a calling convention:
 - New audio recordings registered through Add Visit automatically get
   AudioMoth WAV comment metadata parsed and stored: `recorded_datetime_utc`,
   `recorded_datetime_local`, `device_serial`, `gain_setting`,
-  `battery_voltage`, `temperature_c` (all new `media` columns).
+  `battery_voltage`, `temperature_c` (all new `media` columns). The parser
+  handles the real variation across AudioMoth firmware comment formats
+  (see [metamoth's firmware history](https://metamoth.readthedocs.io/en/latest/firmwares.html)):
+  "gain" vs. "gain setting", "battery was" vs. "battery state was", an
+  optional timezone offset in the UTC parenthetical, no temperature field
+  on older firmware, and firmware 1.5.0+ replacing the "by AudioMoth
+  &lt;serial&gt;" clause entirely with "during deployment &lt;id&gt;" when
+  a deployment ID is configured rather than adding to it -- verified
+  against real documented comment strings for each variant. The timezone
+  lookup used to convert the parsed UTC timestamp to local time
+  (`SELECT tz FROM locations WHERE pk_locationid = ...`) uses a
+  parameterized query, so a location name containing an apostrophe (e.g.
+  "Smith's Field") doesn't break the SQL.
 
 ### `modules/app_modules/registerVisitMediaType.R`
 
