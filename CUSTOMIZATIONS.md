@@ -4,11 +4,7 @@ This fork carries local changes on top of upstream AMMonitor `AMMonitor2.2`
 (commit `585b4a79`), maintained at
 [code.usgs.gov/vtcfwru/ammonitor](https://code.usgs.gov/vtcfwru/ammonitor/-/tree/master).
 Changes fall into three groups: new package functions (`R/`), the Shiny app
-(`inst/shiny/`), and bug fixes to existing (pre-fork) code in either. New
-functions are documented by what they do now, not by their own development
-history -- an issue found and corrected while building a new function isn't
-a "bug fix" in the sense used here, since the function never shipped in a
-broken state to begin with.
+(`inst/shiny/`), and bug fixes to existing (pre-fork) code in either. 
 
 This document was generated using AI.
 
