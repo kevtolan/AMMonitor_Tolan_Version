@@ -59,7 +59,7 @@ image_viewer_ui <- function(id, viewer_mode) {
         tags$style(HTML(
           paste0(
             "#", ns(''), "filters_applied ",
-            "{background-color: yellow; font-size: 20px; font-style: bold;}"
+            "{background-color: yellow; color: black; font-size: 20px; font-style: bold;}"
           )
         ))
       ),

@@ -229,6 +229,22 @@ since they share a calling convention:
   clips/sizes them on screen regardless of their own declared height;
   changing one without the other would have left them visually
   mismatched. Waveform plots (`.wave-plot`, 200px) left as-is.
+- Spectrogram/waveform plot axis titles and tick text (`"Time (s)"`,
+  `"Frequency (kHz)"`, `" Relative Amplitude"`, and their numbers) set
+  to white (`axis.title`/`axis.text` in each `theme()`, across
+  `plot_wave`, `plotline_wave`, `plot_bg`, `plotline`, and `plotx`) --
+  needed once the dark theme (`ui.R`, above) made the page background dark:
+  these are rendered server-side as ggplot images with `bg =
+  "transparent"`, so the axis labels sit directly on the surrounding
+  page (not a plot background), and ggplot's default axis text color
+  (near-black) had become unreadable. Same change in `image_viewer.R`
+  isn't needed -- photos have no axes to label.
+- The `"Warning: Un-applied filters selected..."` banner
+  (`output$filters_applied`) has a hardcoded yellow background
+  (`#filters_applied {background-color: yellow; ...}`); its text color
+  was never set explicitly, so it inherited the dark theme's light body
+  text color and became unreadable against that yellow. Added an
+  explicit `color: black`. Same fix in `image_viewer.R`.
 - `audio_comment_box_ui()` extracted so the comment/detections box can be
   placed independently of the player (used across Player, Tagger,
   Annotation Verifications, and Model Verifications tabs).
@@ -403,11 +419,11 @@ since they share a calling convention:
       `[style*='background: skyblue']`-style attribute-selector
       overrides with `!important`, added centrally here, rather than
       editing every one of those files individually.
-  Does *not* touch the spectrogram/waveform plots themselves (rendered
-  server-side as ggplot images with their own selectable color palette)
-  or reach into modules this pass didn't specifically verify -- some
-  corner of the app not yet clicked through may still have an
-  unstyled light element.
+  Didn't originally touch the spectrogram/waveform plots themselves
+  (rendered server-side as ggplot images) -- see the follow-up fix in
+  `audio_player.R` below for their axis labels. This pass doesn't reach
+  into every module either -- some corner of the app not yet clicked
+  through may still have an unstyled light element.
 
 ### `server.R`
 

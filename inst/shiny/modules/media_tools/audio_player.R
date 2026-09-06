@@ -38,7 +38,7 @@ audio_player_ui <- function(id, viewer_mode) {
         tags$style(HTML(
           paste0(
             "#", ns(''), "filters_applied ",
-            "{background-color: yellow; font-size: 20px; font-style: bold;}"
+            "{background-color: yellow; color: black; font-size: 20px; font-style: bold;}"
           )
         ))
       ),
@@ -1826,7 +1826,9 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
           panel.grid.minor.y = element_blank(),
           legend.position = "none",
           legend.background = element_blank(),
-          legend.box.background = element_blank()
+          legend.box.background = element_blank(),
+          axis.title = element_text(color = "white"),
+          axis.text = element_text(color = "white")
         ) +
         scale_x_continuous(
           name = "Time (s)",
@@ -1854,7 +1856,9 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
           panel.grid.minor = element_blank(),
           legend.background = element_blank(),
           legend.box.background = element_blank(),
-          legend.position = "none"
+          legend.position = "none",
+          axis.title = element_text(color = "white"),
+          axis.text = element_text(color = "white")
         ) +
         scale_x_continuous(
           name = "Time (s)",
@@ -1897,7 +1901,9 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
           panel.grid.minor = element_blank(),
           legend.position = "none",
           legend.background = element_blank(),
-          legend.box.background = element_blank()
+          legend.box.background = element_blank(),
+          axis.title = element_text(color = "white"),
+          axis.text = element_text(color = "white")
         ) +
         scale_x_continuous(
           name = "Time (s)",
@@ -1925,7 +1931,9 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
           panel.grid.minor = element_blank(),
           legend.background = element_blank(),
           legend.box.background = element_blank(),
-          legend.position = "none"
+          legend.position = "none",
+          axis.title = element_text(color = "white"),
+          axis.text = element_text(color = "white")
         ) +
         scale_x_continuous(
           name = "Time (s)",
@@ -2023,7 +2031,9 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
           panel.grid.minor = element_blank(),
           legend.background = element_blank(),
           legend.box.background = element_blank(),
-          legend.position = "none"
+          legend.position = "none",
+          axis.title = element_text(color = "white"),
+          axis.text = element_text(color = "white")
         ) +
         scale_x_continuous(
           name = "Time (s)",
