@@ -18,12 +18,11 @@
 >   `showProgress = TRUE`.
 > - **Bug fixes** -- a double-slash in uploaded media file paths when
 >   uploading to an S3 bucket root, among others.
-> - **Shiny app customizations** -- recording comment box, manual
+> - **Shiny app customizations** -- dark mode, recording comment box, manual
 >   detection-count overrides, AudioMoth metadata capture on visit
 >   registration, species-group (multi-taxon) filtering and other Taxon
->   Model Outputs table UI improvements on Model Verifications, layout
->   adjustments (narrower sidebar, wider/taller spectrogram view), and
->   an app-wide dark theme.
+>   Model Outputs table UI improvements on Model Verifications, and layout
+>   adjustments (narrower sidebar, wider/taller spectrogram view).
 
 # AMMonitor
 
