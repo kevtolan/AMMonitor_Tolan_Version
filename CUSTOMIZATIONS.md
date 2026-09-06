@@ -284,6 +284,13 @@ since they share a calling convention:
   panel. Tracks its own just-saved state locally, since it receives the
   shared metadata cache as a read-only reactive getter rather than a
   `reactiveValues` object.
+- Recording-level Tags' dropdown/bbox-list `selectizeInput()`s no longer
+  show a label at all (`label = x` -> `label = NULL`). `x` here is the
+  raw `pk_medialistid` value (e.g. `recording_non_taxa_bbox`), not a
+  curated display name -- always a little rough as a label, and once
+  the Tagger's left sidebar was narrowed (see `ui.R`) a long
+  underscore-separated value like that has no spaces to wrap on, so it
+  just overflowed the column instead of wrapping.
 
 ### `modules/media_tools/image_viewer.R`
 

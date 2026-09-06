@@ -195,7 +195,7 @@ audio_annotator_server <- function(id, selectedUser = reactive(NA), audio_name, 
             
             selectizeInput(
               inputId = ns(x),
-              label = x,
+              label = NULL,
               choices = c("", choices),
               multiple = FALSE
             )
