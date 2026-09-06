@@ -17,7 +17,14 @@
 >   elapsed time, throughput, and real-time-speed multiplier when
 >   `showProgress = TRUE`.
 > - **Bug fixes** -- a double-slash in uploaded media file paths when
->   uploading to an S3 bucket root, among others.
+>   uploading to an S3 bucket root; `download.file()` failures on
+>   recordings whose filenames contain spaces; `scoresDetect()` silently
+>   ignoring an unnamed `scoreThresholds` vector instead of matching it
+>   against templates as documented; a client-side JS race that could
+>   silently break an entire Shiny session's reactivity; a crash when
+>   adding media to a pre-existing visit; and a `NA`/`-Inf` crash in the
+>   Taxon Model Outputs table's time-range filter for recordings with no
+>   qualifying detections, among others.
 > - **Shiny app customizations** -- dark mode, recording comment box, manual
 >   detection-count overrides, AudioMoth metadata capture on visit
 >   registration, species-group (multi-taxon) filtering and other Taxon
