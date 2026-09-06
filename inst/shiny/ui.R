@@ -151,11 +151,11 @@ ui <- dashboardPage(
             tabName = 'Tagger',
             fluidRow(
               column(
-                width = 2,
+                width = 1,
                 audio_annotator_ui("audio_annotator")
               ),
               column(
-                width = 10,
+                width = 11,
                 audio_player_ui("audio_player_tagger", viewer_mode = "tagger")
               )
             ),

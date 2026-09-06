@@ -220,6 +220,15 @@ since they share a calling convention:
   12 grid columns (about a sixth of the page) unused on the right for no
   reason. The spectrogram/waveform `plotOutput()`s were already
   `width = "100%"` of their container, so this widens them too.
+- Spectrogram plots (`plot_bg`/`plotline`/`plotx`, the three overlaid
+  `plotOutput()`s inside the `.large-plot` div -- background image, line
+  overlay, interactive click/hover layer) made slightly taller, 300px ->
+  350px. Updated all four `plotOutput(height = ...)` calls *and* the
+  `.large-plot` CSS class's own `height: 300px` together -- the plots are
+  `position: absolute` inside that div, so its height is what actually
+  clips/sizes them on screen regardless of their own declared height;
+  changing one without the other would have left them visually
+  mismatched. Waveform plots (`.wave-plot`, 200px) left as-is.
 - `audio_comment_box_ui()` extracted so the comment/detections box can be
   placed independently of the player (used across Player, Tagger,
   Annotation Verifications, and Model Verifications tabs).
@@ -355,6 +364,15 @@ since they share a calling convention:
   what pushes the main content area -- including the audio player's
   spectrogram, which already fills the full content width -- further
   left; there's no separate spectrogram-specific position to adjust.
+- Audio Tagger's left "annotator" sidebar (`audio_annotator_ui()`)
+  narrowed from `column(2, ...)` to `column(1, ...)`, with the player
+  column (containing the spectrogram) next to it widened from
+  `column(10, ...)` to `column(11, ...)` to match (Bootstrap columns in
+  a row need to add up to 12). Only the Tagger tab has this left/right
+  split at the `ui.R` level -- Player, Annotation Verifications, and
+  Model Verifications place `audio_player_ui()` directly, so its own
+  internal `column(12, ...)` (see `audio_player.R` below) already gives
+  it the full row on those tabs.
 
 ### `server.R`
 

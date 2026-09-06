@@ -365,18 +365,18 @@ audio_player_ui <- function(id, viewer_mode) {
               plotOutput(
                 ns('plot_bg'),
                 width = "100%",
-                height = "300px"
+                height = "350px"
               ), # the_spec
               plotOutput(
                 ns('plotline'),
                 width = "100%",
-                height = "300px"
+                height = "350px"
               ), # the line
               {if (viewer_mode == 'tagger') {
                 plotOutput(
                   ns("plotx"),
                   width = "100%",
-                  height = "300px",
+                  height = "350px",
                   brush = brushOpts(id = ns("spec_brush"), resetOnNew = TRUE),
                   dblclick = ns("spec_dbl"),
                   click = ns("spec_click"),
@@ -386,7 +386,7 @@ audio_player_ui <- function(id, viewer_mode) {
                 plotOutput(
                   ns("plotx"),
                   width = "100%",
-                  height = "300px",
+                  height = "350px",
                   click = ns("spec_click"),
                   hover = hoverOpts(id = ns("spec_hover"), delay = 100, delayType = "debounce")
                 )
@@ -453,7 +453,7 @@ audio_player_ui <- function(id, viewer_mode) {
       "
         .large-plot {
             position: relative;
-            height: 300px;
+            height: 350px;
         }
         #", id, "-plot_bg {
             position: absolute;
