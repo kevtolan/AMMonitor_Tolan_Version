@@ -17,9 +17,8 @@
 >   elapsed time, throughput, and real-time-speed multiplier when
 >   `showProgress = TRUE`.
 > - **Bug fixes** -- a double-slash in uploaded media file paths when
->   uploading to an S3 bucket root; a `birdsDetect()` failure on recordings
->   whose filenames contain spaces.
-> - **Shiny app customizations** -- per-recording comments, manual
+>   uploading to an S3 bucket root, among others.
+> - **Shiny app customizations** -- recording comment box, manual
 >   detection-count overrides, AudioMoth metadata capture on visit
 >   registration, and Taxon Model Outputs table UI improvements.
 
