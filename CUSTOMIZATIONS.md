@@ -210,7 +210,7 @@ since they share a calling convention:
   so it would have silently kept only the first selected taxon once
   multi-select was possible.
 - Default Spectrogram Frequency Range changed to 0-8 kHz; default
-  Spectrogram Length changed to 20s.
+  Spectrogram Length changed to 30s (originally 20s).
 - Player/spectrogram section widened to the full page width
   (`column(10, ...)` -> `column(12, ...)`). It sat directly below the
   "Recording Filters & Settings" box, which already spans the full

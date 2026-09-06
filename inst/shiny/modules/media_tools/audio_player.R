@@ -222,7 +222,7 @@ audio_player_ui <- function(id, viewer_mode) {
                       inputId = ns("specLength"),
                       label = 'Spectrogram Length (s):',
                       min = 1,
-                      value = 20
+                      value = 30
                     )
                   ),
                   column(
