@@ -260,6 +260,32 @@ since they share a calling convention:
   atomic vectors` when opening Model Verifications (or right after
   pressing Apply Filters). Now guarded with
   `req(is.data.frame(metadata_cache()$cache$annotations))`.
+- Fixed a regression (a side effect of the `audio_avail()`/`photos_avail()`
+  fixes in `audio_player.R`/`image_viewer.R` above): the "Taxon Model
+  Outputs" table stopped showing whether a model output had already been
+  verified at all -- the `verified` column was missing from the table
+  entirely, not just blank. `output$taxon_table`'s `reactable` locks in
+  its column set at whatever data it's *first* rendered with; every
+  update after that goes through `reactable::updateReactable(data =
+  ...)`, which can refresh cell values but can't add a brand-new column
+  to an already-built table. `verified` was only ever added to the
+  `modelOutputs` data.frame *conditionally* (`if (nrow(modelOutputs) !=
+  0) { modelOutputs <- cbind(modelOutputs, 'verified' = NA); ... }`) --
+  fine as long as the very first render happened to already have data,
+  which used to be guaranteed because reading an unfired
+  `audio_avail()`/`photos_avail()` threw and blocked that first render
+  until real data existed. Now that those always resolve immediately
+  (even to an empty placeholder), the table's first-ever render routinely
+  catches 0 rows, and `verified` never made it into that locked-in
+  schema. Fixed by adding the `verified` column unconditionally (using
+  `rep(NA, nrow(modelOutputs))`, not a bare `NA` -- `cbind` requires an
+  added column's length to already match `nrow()`, and a bare `NA` errors
+  "arguments imply differing number of rows" against a 0-row data.frame).
+  The same fragile pattern existed for the Annotation Verifications
+  page's own `verified` column (`if (nrow(annoTable) != 0 && viewer_mode
+  == 'verifier')`); fixed there too by dropping the `nrow` guard, since
+  `merge()` already returns the right columns (`verified`, after the
+  rename) regardless of row count.
 
 ### `modules/app_modules/registerVisitUpdateDB.R`
 

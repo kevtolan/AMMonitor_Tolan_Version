@@ -197,7 +197,13 @@ annotation_viewer_tables_server <- function(id, selectedUser = reactive(NA), act
         )
       )
       
-      if (nrow(annoTable) != 0 && viewer_mode == 'verifier') {
+      if (viewer_mode == 'verifier') {
+        # Not guarded on nrow(annoTable) != 0 (unlike modeloutputs' matching
+        # 'verified' column below) -- merge() already returns the right
+        # columns, including 'verified' after the rename, even with 0 rows
+        # in annoTable, so there's no reason to skip it and risk the same
+        # column-gets-locked-out-of-the-table-forever problem as the
+        # modelOutputs case above.
         annotationverifications <- metadata_cache()$cache$annotationverifications[
           metadata_cache()$cache$annotationverifications$fk_personid == selectedUser() & metadata_cache()$cache$annotationverifications$is_delete == 0,
           c('pk_annoverificationid', 'is_valid', 'fk_annotationid')
@@ -256,17 +262,31 @@ annotation_viewer_tables_server <- function(id, selectedUser = reactive(NA), act
       }
       
       if (viewer_mode == 'modelOutputs') {
-        # Merge in model verifications
+        # Merge in model verifications. 'verified' is added unconditionally
+        # (even when modelOutputs has 0 rows), not just when there's data to
+        # fill it with: output$taxon_table's reactable locks in its column
+        # set at whatever data it FIRST renders with (see onStartup below);
+        # later updates go through updateReactable(data = ...), which can
+        # refresh cell values but can't add a brand new column to an
+        # already-built table. If 'verified' were only added once real rows
+        # existed, a first render that happened to catch 0 rows (e.g. before
+        # Apply Filters produces any data) would permanently lock this
+        # column out of the table for the rest of the session.
+        # rep(NA, nrow(...)), not a bare NA: cbind.data.frame requires an
+        # added column's length to already match nrow (or be recyclable
+        # into it) -- a bare NA (length 1) errors ("arguments imply
+        # differing number of rows") whenever modelOutputs has 0 rows,
+        # since length 1 doesn't divide evenly into 0.
+        modelOutputs <- cbind(modelOutputs, 'verified' = rep(NA, nrow(modelOutputs)))
+
         if (nrow(modelOutputs) != 0) {
-          modelOutputs <- cbind(modelOutputs, 'verified' = NA)
-          
           modelverifications <- metadata_cache()$cache$modelverifications[
             metadata_cache()$cache$modelverifications$fk_modeloutputid %in% modelOutputs$pk_modeloutputid & metadata_cache()$cache$modelverifications$fk_personid == selectedUser() & metadata_cache()$cache$modelverifications$is_delete == 0,
           ]
-          
+
           modelOutputs$verified[match(modelverifications$fk_modeloutputid, modelOutputs$pk_modeloutputid)] <- modelverifications$is_valid
         }
-        
+
         annoTable <- modelOutputs
       }
       
