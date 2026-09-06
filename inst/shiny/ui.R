@@ -319,6 +319,23 @@ ui <- dashboardPage(
       .rt-td {
         border-color: #3a3f44 !important;
       }
+      /* .Reactable is the OUTER widget wrapper (also white by reactable's
+         own CSS) -- separate from .rt-table above. The pagination footer
+         (page numbers, page-size selector) sits inside .Reactable but
+         outside .rt-table, so it was showing this wrapper's white
+         background through even with .rt-table itself already dark. */
+      .Reactable {
+        background-color: #23272b !important;
+        color: #e8e8e8 !important;
+      }
+      .rt-page-jump, .rt-page-size-select, .rt-search {
+        background-color: #2b3035 !important;
+        border-color: #444a50 !important;
+        color: #e8e8e8 !important;
+      }
+      .rt-page-button:hover, .rt-page-button:active {
+        background-color: rgba(255, 255, 255, 0.08) !important;
+      }
       .nav-tabs-custom, .nav-tabs-custom > .tab-content {
         background-color: #23272b;
       }

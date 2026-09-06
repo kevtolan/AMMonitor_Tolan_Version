@@ -437,6 +437,15 @@ since they share a calling convention:
       `!important` on this app's rules, reactable's own CSS wins on load
       order alone and every table (Taxon Model Outputs, File Tags, etc.)
       stayed white.
+    - Missed on the first pass: `.Reactable` (capital R) is a *separate*,
+      outer wrapper div, also hardcoded white by reactable's own CSS --
+      distinct from `.rt-table` above. The pagination footer (page
+      numbers, page-size selector) lives inside `.Reactable` but outside
+      `.rt-table`, so it kept showing this wrapper's white background
+      even once the table body itself was already dark. Its page-jump
+      box and page-size `<select>` (`.rt-page-jump`/`.rt-page-size-select`)
+      are separately hardcoded white too. All three needed their own
+      `!important` overrides, same reasoning as `.rt-table` above.
     - A handful of modules (`my_home.R`, several `apps/*.R` and
       `app_modules/*.R` instructional banners) hardcode a light
       `wellPanel` background directly (`style = "background: skyblue"`,
