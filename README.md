@@ -20,7 +20,10 @@
 >   uploading to an S3 bucket root, among others.
 > - **Shiny app customizations** -- recording comment box, manual
 >   detection-count overrides, AudioMoth metadata capture on visit
->   registration, and Taxon Model Outputs table UI improvements.
+>   registration, species-group (multi-taxon) filtering and other Taxon
+>   Model Outputs table UI improvements on Model Verifications, layout
+>   adjustments (narrower sidebar, wider/taller spectrogram view), and
+>   an app-wide dark theme.
 
 # AMMonitor
 
