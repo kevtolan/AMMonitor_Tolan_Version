@@ -662,9 +662,10 @@ qryMedia <- function(con, disconnect = FALSE, locationID = 'all', dateRange = li
 #' date.
 #' @param visitID Specify a specific visit (pk_visitid) from the visits table.
 #' Default is NULL.
-#' @param taxonID Specify a specific taxon (pk_taxonid) from the taxa table. 
+#' @param taxonID Specify one taxon (pk_taxonid) from the taxa table, or a
+#' character vector of several to match any of them (a species group).
 #' Default is "all".
-#' @param excludeAnnoVerified Specify when to exclude based on verification 
+#' @param excludeAnnoVerified Specify when to exclude based on verification
 #' status. Default is "NA".
 #' @param confValue Specify a confidence level to filter modeloutputs 
 #' (model_value).  Default is 0.
@@ -766,13 +767,22 @@ qryModelOutputsMedia <- function(con, disconnect = FALSE, locationID = 'all', da
     param_counter <- param_counter + 1
   }
   
-  if (taxonID != 'all') {
+  if (!identical(taxonID, 'all')) {
+    # taxonID may be a vector (a species group -- e.g. all owls plus
+    # Eastern Whip-poor-will), not just a single taxon; `taxonID != 'all'`
+    # would error ("the condition has length > 1") in that case, so this
+    # checks the whole vector at once with identical() instead, and always
+    # builds an IN (...) clause (one element works the same as `=`).
     where_clauses <- c(
       where_clauses,
-      paste0('modeloutputs.fk_taxonid = $', param_counter)
+      paste0(
+        'modeloutputs.fk_taxonid IN (',
+        paste0("$", param_counter:(param_counter + length(taxonID) - 1), collapse = ", "),
+        ')'
+      )
     )
-    params[[param_counter]] <- taxonID
-    param_counter <- param_counter + 1
+    params <- append(params, as.list(taxonID))
+    param_counter <- param_counter + length(taxonID)
   }
   
   if (newOnly && !is.na(selectedUser)) {

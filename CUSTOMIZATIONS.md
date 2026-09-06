@@ -195,6 +195,20 @@ since they share a calling convention:
 - **Select Taxa** and **Select a Location** filters are searchable (type to
   filter) instead of plain scrolling dropdowns (`selectInput` ->
   `selectizeInput`).
+- On the Model Verifications page specifically, **Select Taxa is
+  multi-select**, to filter to a species group (e.g. every owl species
+  plus Eastern Whip-poor-will) in one go rather than one taxon at a time.
+  Selectize's default search already fuzzy-matches typed text against
+  every species' common name, so typing "owl" surfaces all owl species
+  with no extra grouping data needed. Empty selection means no filter
+  (same meaning the dedicated "all" choice has in the other, still
+  single-select, modes). `qryModelOutputsMedia()`'s `taxonID` parameter
+  now accepts a vector for this (builds a SQL `IN (...)` clause; a single
+  value still works exactly as before). Also switched several `ifelse()`
+  calls that read `input$filterTaxa` to plain `if`/`else`: `ifelse()`'s
+  result length follows its *test* argument, not its "yes"/"no" arguments,
+  so it would have silently kept only the first selected taxon once
+  multi-select was possible.
 - Default Spectrogram Frequency Range changed to 0-8 kHz; default
   Spectrogram Length changed to 20s.
 - `audio_comment_box_ui()` extracted so the comment/detections box can be
@@ -344,6 +358,32 @@ since they share a calling convention:
   reactive graph in the abstract -- the first two fixes attempted (before
   the top-level `isolate(audio_avail())` block was found) resolved
   different, real, but insufficient parts of the failure.
+- A later, separate crash report (loud `Error in <Anonymous>: error in
+  evaluating the argument 'x' in selecting a method for function 'nrow'`,
+  from dozens of different outputs/observers) turned out to be the same
+  underlying mechanism as above, just at different call sites: removing
+  the one top-level `isolate(nrow(audio_avail()))` block fixed *that*
+  call site, but `audio_avail()`/`photos_avail()` are read bare (no
+  `req()` guard) all over both files -- every `renderText`, `renderPlot`,
+  `renderUI`, and `observe` that touches `nrow(audio_avail())` or
+  `audio_avail()$...` before "Apply Filters" is ever clicked hit the exact
+  same problem independently. `nrow()` is an S4 generic; R wraps whatever
+  error occurs while evaluating its argument in a *new* plain error,
+  which strips the `shiny.silent.error` class Shiny's render/reactive
+  framework checks for to decide "quietly suspend this output" vs. "print
+  a loud warning" -- so an unfired `eventReactive` read through `nrow()`
+  (or similar) always surfaces loudly, never silently, regardless of
+  `req()` guards anywhere else in the app. Rather than hunting down and
+  guarding every individual call site, fixed it at the source: removed
+  `ignoreInit = TRUE` from both `eventReactive`s and added an explicit
+  check inside the reactive body instead (`if (input$apply_filters == 0)
+  return(<empty placeholder data.frame>)`, matching the real column
+  shape). `audio_avail()`/`photos_avail()` now never throw -- before the
+  button's first real click they just report zero rows, exactly like a
+  filtered search that matched nothing, so every downstream `nrow()`/`$`
+  read sees a valid (empty) value instead of an unfired reactive.
+  Verified with the trial database: opening Model Verifications and
+  leaving every filter at its default no longer logs any error at all.
 
 ## Related database schema changes (not in this repo)
 

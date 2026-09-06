@@ -406,11 +406,32 @@ image_viewer_server <- function(id, selectedUser = reactive(NA), active = reacti
     
     photos_on_startup <- reactiveVal(1) # For altering startup behavior of apply_filters
 
-    # Filtered dataframe of available photos. ignoreInit = TRUE so this
-    # doesn't run (and render a photo) until the user actually presses
-    # Apply Filters -- previously it fired once on load with the blank/default
-    # filters, which was slow and showed a photo nobody asked to see.
+    # Filtered dataframe of available photos. Returns an empty placeholder
+    # on the very first invocation (input$apply_filters is still its
+    # untouched initial value of 0, i.e. Apply Filters has never actually
+    # been clicked) instead of running the query with blank/default
+    # filters -- that used to run eagerly and show a photo nobody asked
+    # to see. An earlier fix used ignoreInit = TRUE to stop that instead,
+    # so photos_avail() didn't fire at all until Apply Filters was clicked
+    # -- but that made every bare nrow(photos_avail())/photos_avail()$...
+    # read elsewhere in this file throw a loud, uncatchable error rather
+    # than gracefully waiting: nrow() and friends are generics, and
+    # evaluating their argument wraps whatever error occurs in a *new*
+    # plain error, stripping the shiny.silent.error class Shiny needs to
+    # suspend an output quietly instead of reporting it (see the matching
+    # fix and longer explanation in audio_player.R). Returning a real
+    # (empty) data.frame instead sidesteps that entirely.
     photos_avail <- eventReactive(input$apply_filters, {
+      if (input$apply_filters == 0) {
+        return(data.frame(
+          pk_mediaid = integer(0),
+          filename = character(0),
+          filepath = character(0),
+          start_date = character(0),
+          start_time = character(0)
+        ))
+      }
+
       # First, save metadata cache (if needed)
       if (
         photos_on_startup() != 1 &&
@@ -506,7 +527,7 @@ image_viewer_server <- function(id, selectedUser = reactive(NA), active = reacti
       i_photo(1)
       i_cache(1)
       photos
-    }, ignoreInit = TRUE)
+    })
     
     i_cache <- reactiveVal(1) # Initialize cache counter
     

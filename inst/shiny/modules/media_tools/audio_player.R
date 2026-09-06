@@ -86,8 +86,13 @@ audio_player_ui <- function(id, viewer_mode) {
                 ),
                 selectizeInput(
                   ns('filterTaxa'),
-                  'Select Taxa:',
-                  choices = c('all')
+                  if (viewer_mode == "modelOutputs") {
+                    'Select Taxa (leave blank for all; pick several for a species group):'
+                  } else {
+                    'Select Taxa:'
+                  },
+                  choices = c('all'),
+                  multiple = viewer_mode == "modelOutputs"
                 ),
                 checkboxInput(
                   ns('random_order'),
@@ -673,11 +678,34 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
 
     audio_on_startup <- reactiveVal(1) # For altering startup behavior of apply_filters
 
-    # Filtered dataframe of available recordings. ignoreInit = TRUE so this
-    # doesn't run (and render a spectrogram) until the user actually presses
-    # Apply Filters -- previously it fired once on load with the blank/default
-    # filters, which was slow and showed a spectrogram nobody asked to see.
+    # Filtered dataframe of available recordings. Returns an empty
+    # placeholder on the very first invocation (input$apply_filters is
+    # still its untouched initial value of 0, i.e. Apply Filters has never
+    # actually been clicked) instead of running the query with
+    # blank/default filters -- that used to run eagerly and show a
+    # spectrogram nobody asked to see. An earlier fix used ignoreInit =
+    # TRUE to stop that instead, so audio_avail() didn't fire at all until
+    # Apply Filters was clicked -- but that made every bare
+    # nrow(audio_avail())/audio_avail()$... read elsewhere in this file
+    # (there's no shortage of them) throw a loud, uncatchable error rather
+    # than gracefully waiting: nrow() and friends are generics, and
+    # evaluating their argument wraps whatever error occurs in a *new*
+    # plain error, stripping the shiny.silent.error class Shiny needs to
+    # suspend an output quietly instead of reporting it. Returning a real
+    # (empty) data.frame instead sidesteps that: audio_avail() never
+    # throws, it just briefly reports zero rows, exactly like a filtered
+    # search that matched nothing.
     audio_avail <- eventReactive(input$apply_filters, {
+      if (input$apply_filters == 0) {
+        return(data.frame(
+          pk_mediaid = integer(0),
+          filename = character(0),
+          filepath = character(0),
+          start_date = character(0),
+          start_time = character(0)
+        ))
+      }
+
       output$filters_applied <- renderText("")
       audios <- switch(
         viewer_mode,
@@ -690,7 +718,12 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
             list(input$filterDateRange)
           ),
           visitID = visitID(),
-          taxonID = ifelse(is.null(input$filterTaxa), 'all', input$filterTaxa),
+          # "Select Taxa" is multi-select in this mode (a species group,
+          # e.g. all owls plus Eastern Whip-poor-will), so this can be a
+          # vector -- ifelse() would silently keep only the first selected
+          # taxon, since its result length follows is.null()'s length (1),
+          # not input$filterTaxa's.
+          taxonID = if (length(input$filterTaxa) == 0) 'all' else input$filterTaxa,
           excludeAnnoVerified = input$excludeAnnoVerified,
           selectedUser = selectedUser(),
           model = input$modelID,
@@ -769,7 +802,7 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
       i_audio(1)
       i_cache(1)
       audios
-    }, ignoreInit = TRUE)
+    })
 
     i_cache <- reactiveVal(1) # Initialize cache counter
 
@@ -879,6 +912,20 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
         cache_mediatags <- dbGetQuery(con(), 'SELECT pk_mediatagid, fk_mediaid, fk_personid, fk_medialistid, item, value_num FROM mediatags INNER JOIN medialistitems ON mediatags.fk_medialistitemid = medialistitems.pk_medialistitemid WHERE pk_mediatagid = -99;')
       } else {
         cache_media <- audio_avail()$pk_mediaid[i_cache_start:i_cache_end]
+        # input$filterTaxa is a plain scalar ("all" or one taxon id) in
+        # every viewer_mode except modelOutputs, where "Select Taxa" is
+        # multi-select (to filter by a group of species -- e.g. all owls
+        # plus Eastern Whip-poor-will -- at once). Compute the IN-list
+        # clause once here, handling both cases correctly: a naive
+        # ifelse() below would silently truncate a multi-element selection
+        # to its first value, since ifelse()'s result length follows its
+        # *test* argument's length, not its "yes"/"no" arguments'.
+        no_taxon_filter <- length(input$filterTaxa) == 0 || identical(input$filterTaxa, "all")
+        taxon_in_list <- if (no_taxon_filter) {
+          NULL
+        } else {
+          paste0("'", gsub("'", "''", input$filterTaxa), "'", collapse = ", ")
+        }
         cache_annotations <- DBI::dbGetQuery(
           con(),
           paste(
@@ -889,11 +936,7 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
               "NULL"
             ),
             ')',
-            ifelse(
-              input$filterTaxa == "all",
-              "",
-              paste0(" AND annotations.fk_taxonid = '", input$filterTaxa, "'")
-            ),
+            if (no_taxon_filter) "" else paste0(" AND annotations.fk_taxonid IN (", taxon_in_list, ")"),
             ';'
           )
         )
@@ -919,11 +962,7 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
               "NULL"
             ),
             ') ',
-            ifelse(
-              input$filterTaxa == "all",
-              "",
-              paste0(" AND modeloutputs.fk_taxonid = '", input$filterTaxa, "'")
-            ),
+            if (no_taxon_filter) "" else paste0(" AND modeloutputs.fk_taxonid IN (", taxon_in_list, ")"),
             ifelse(
               input$modelID == "all",
               "",
@@ -2263,14 +2302,21 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
     }, ignoreInit = TRUE)
 
     # Taxon Filters ---------------------------
-
+    # modelOutputs mode's "Select Taxa" is multi-select (a species group,
+    # e.g. all owls plus Eastern Whip-poor-will -- selectize's built-in
+    # search already matches "owl" against every owl species' common name,
+    # so no extra grouping data is needed). It has no "all" choice: nothing
+    # selected means no filter, same meaning "all" has in the other modes'
+    # single-select.
     updateSelectizeInput(
       session,
       'filterTaxa',
-      choices = c('all', sort(
-        taxon_names$pk_taxonid,
-      )),
-      selected = 'all'
+      choices = if (viewer_mode == "modelOutputs") {
+        sort(taxon_names$pk_taxonid)
+      } else {
+        c('all', sort(taxon_names$pk_taxonid))
+      },
+      selected = if (viewer_mode == "modelOutputs") character(0) else 'all'
     )
 
     # Show the number of audios found with the given filters
