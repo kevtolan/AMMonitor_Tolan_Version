@@ -1444,6 +1444,17 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
     })
 
     # Update start time and clear old .wav files when switching to a new audio file
+    # High priority: output$player's renderUI reads updateCurTime()/startTime()
+    # via isolate() (to avoid rebuilding the whole <audio> tag on every
+    # scrub/spec-click), so it only ever picks up the reset-to-0 here if
+    # this observer has already run by the time that render actually
+    # executes. Both this observer and the render are triggered by the
+    # same upstream change (i_audio()) through separate paths, and Shiny
+    # doesn't otherwise guarantee which one runs first within the same
+    # flush -- without forcing this one first, whether "Previous
+    # file"/"Next file" actually resets playback to 00:00 would depend on
+    # execution order that isn't guaranteed, i.e. it could appear to work
+    # sometimes and not others.
     observe({
       audio_avail()$pk_mediaid[i_audio()]
       updateCurTime(0)
@@ -1458,7 +1469,7 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
         }
 
       }
-    }) |> bindEvent(audio_avail()$pk_mediaid[i_audio()])
+    }, priority = 100) |> bindEvent(audio_avail()$pk_mediaid[i_audio()])
 
 
     # Update tags (and clear old ones) when switching to a new audio file

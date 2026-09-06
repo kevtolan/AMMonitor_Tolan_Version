@@ -237,6 +237,21 @@ since they share a calling convention:
   so a file without a trailing newline (the common case when it's been
   hand-edited) no longer prints an "incomplete final line" warning on
   every app start. Same change in `image_viewer.R`.
+- "Previous file"/"Next file" now reliably reset playback to 00:00 (and
+  the spectrogram view back to its first window) on the newly-loaded
+  recording, instead of sometimes carrying over wherever you'd scrubbed
+  to on the previous one. The reset itself (`updateCurTime(0)`,
+  `startTime(0)`) already existed, in an `observe()` keyed off the
+  current recording changing -- but `output$player`'s `renderUI` (which
+  rebuilds the `<audio>` tag and embeds `myAudio.currentTime = ...`)
+  reads both via `isolate()`, specifically so scrubbing/spec-clicks don't
+  rebuild the whole audio element on every move. That means the rebuild
+  only picks up the reset if the reset observer has already run by the
+  time the rebuild executes -- and since both are triggered by the same
+  upstream change (the recording index) through separate reactive paths,
+  Shiny doesn't otherwise guarantee which runs first in a given flush.
+  Gave the reset observer `priority = 100` so it's guaranteed to run
+  first, rather than leaving it to depend on unguaranteed flush ordering.
 
 ### `modules/media_tools/audio_annotator.R`
 
