@@ -186,6 +186,34 @@ ui <- dashboardPage(
         padding-right:0 !important;
       }"
     ),
+    tags$style(
+      # AdminLTE (shinydashboard's underlying theme) hardcodes its default
+      # sidebar width (230px) in several places at once -- the sidebar
+      # itself, the content area's left margin, the header logo, and the
+      # header navbar -- all inside its own >=768px ("desktop") media
+      # query. shinydashboard doesn't expose a sidebar-width option, so
+      # narrowing it means overriding all of these together (only the
+      # desktop breakpoint; below 768px AdminLTE turns the sidebar into an
+      # overlay instead, which this leaves alone). 172.5px = 230px * 0.75,
+      # 25% narrower. Narrowing the sidebar this way is also what pushes
+      # the main content area (including the audio player's spectrogram,
+      # which already fills the full content width) further left -- there
+      # isn't a separate spectrogram-specific position to adjust.
+      "@media (min-width: 768px) {
+        .main-sidebar, .left-side {
+          width: 172.5px;
+        }
+        .content-wrapper, .right-side, .main-footer {
+          margin-left: 172.5px;
+        }
+        .main-header .logo {
+          width: 172.5px;
+        }
+        .main-header .navbar {
+          margin-left: 172.5px;
+        }
+      }"
+    ),
     tags$title("AMMonitor")
   )
 ) # end dashboard page

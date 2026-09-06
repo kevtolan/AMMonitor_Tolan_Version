@@ -330,6 +330,16 @@ since they share a calling convention:
 ### `ui.R`
 
 - Wires `audio_comment_box_ui()` into all four Audio sub-tabs.
+- Left sidebar narrowed 25%, from AdminLTE's default 230px to 172.5px.
+  shinydashboard doesn't expose a sidebar-width option -- AdminLTE
+  hardcodes 230px in four places at once, all inside its own >=768px
+  ("desktop") media query: the sidebar itself, the content area's left
+  margin, the header logo width, and the header navbar's left margin.
+  Overrode all four together (leaving the sub-768px mobile breakpoint,
+  where the sidebar becomes an overlay instead, untouched). This is also
+  what pushes the main content area -- including the audio player's
+  spectrogram, which already fills the full content width -- further
+  left; there's no separate spectrogram-specific position to adjust.
 
 ### `server.R`
 
