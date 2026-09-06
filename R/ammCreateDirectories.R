@@ -108,7 +108,15 @@ ammCreateDirectories <- function(amm_dirname, filepath){
   fileConn <- file(paste0(full.path, "/settings/cache_size.txt"))
   writeLines(text = "1e6", fileConn)
   close(fileConn)
-  
+
+  fileConn <- file(paste0(full.path, "/settings/spec_length.txt"))
+  writeLines(text = "30", fileConn)
+  close(fileConn)
+
+  fileConn <- file(paste0(full.path, "/settings/spec_height.txt"))
+  writeLines(text = "8", fileConn)
+  close(fileConn)
+
   # Copy default queries
   file.copy(
     from = file.path(find.package("AMMonitor"), "extdata/queries.xlsx"), 

@@ -262,6 +262,25 @@ since they share a calling convention:
   so a file without a trailing newline (the common case when it's been
   hand-edited) no longer prints an "incomplete final line" warning on
   every app start. Same change in `image_viewer.R`.
+- Two new optional per-project settings files, read the same way as
+  `cache_size.txt`/`autosave_rate.txt` (plain text, one number, in the
+  project's `settings/` directory -- silently ignored if missing or
+  unparseable):
+    - `spec_length.txt` overrides the "Spectrogram Length (s):"
+      `numericInput`'s default (still 30 if absent).
+    - `spec_height.txt` overrides the default upper bound (kHz) of the
+      per-recording "Spectrogram Frequency Range" slider (still 8 if
+      absent). Unlike `specLength`, that slider is only ever built by a
+      `renderUI` once a recording actually loads (its `max` depends on
+      the recording's own sample rate) -- so the configured value is
+      held in a `reactiveVal` (`default_spec_height`) read fresh each
+      time that `renderUI` runs, rather than pushed once via
+      `updateNumericInput`/`updateSliderInput` like the other settings
+      files.
+    Also added to `ammCreateDirectories()` (`R/ammCreateDirectories.R`)
+    alongside `cache_size.txt`/`autosave_rate.txt`/`default_user.txt`, so
+    every newly-created AMMonitor project gets both files (`30` and `8`)
+    from the start, not just this one project.
 - "Previous file"/"Next file" now reliably reset playback to 00:00 (and
   the spectrogram view back to its first window) on the newly-loaded
   recording, instead of sometimes carrying over wherever you'd scrubbed

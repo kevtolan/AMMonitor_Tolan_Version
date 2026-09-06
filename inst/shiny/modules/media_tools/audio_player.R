@@ -587,6 +587,38 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
       }
     }
 
+    if (file.exists(paste(ammPath, 'settings', 'spec_length.txt', sep = '/'))) {
+      spec_length <- suppressWarnings(as.numeric(trimws(readLines(
+        paste(ammPath, 'settings', 'spec_length.txt', sep = '/'),
+        warn = FALSE
+      )[1])))
+      if (is.numeric(spec_length) && !is.na(spec_length)) {
+        updateNumericInput(
+          session,
+          'specLength',
+          'Spectrogram Length (s):',
+          value = spec_length,
+          min = 1
+        )
+      }
+    }
+
+    # Default upper bound (kHz) for the per-recording Spectrogram Frequency
+    # Range slider below -- a reactiveVal (not a plain local) because that
+    # slider is only actually built once a recording loads (renderUI,
+    # dependent on fullAudio()), well after this project-level settings file
+    # is read at module setup.
+    default_spec_height <- reactiveVal(8)
+    if (file.exists(paste(ammPath, 'settings', 'spec_height.txt', sep = '/'))) {
+      spec_height <- suppressWarnings(as.numeric(trimws(readLines(
+        paste(ammPath, 'settings', 'spec_height.txt', sep = '/'),
+        warn = FALSE
+      )[1])))
+      if (is.numeric(spec_height) && !is.na(spec_height)) {
+        default_spec_height(spec_height)
+      }
+    }
+
     observe({
       req(con())
       modelIDquery <- dbGetQuery(con(), 'SELECT pk_modelid, model_name FROM models ORDER BY model_name;')
@@ -2085,7 +2117,7 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
         min = 0,
         max = fullAudio()@samp.rate/2000,
         step = 0.01,
-        value = c(0, min(8, fullAudio()@samp.rate/2000))
+        value = c(0, min(default_spec_height(), fullAudio()@samp.rate/2000))
       )
     })
 
