@@ -422,7 +422,12 @@ image_viewer_server <- function(id, selectedUser = reactive(NA), active = reacti
     # fix and longer explanation in audio_player.R). Returning a real
     # (empty) data.frame instead sidesteps that entirely.
     photos_avail <- eventReactive(input$apply_filters, {
-      if (input$apply_filters == 0) {
+      # (see the matching fix and longer explanation in audio_player.R)
+      # input$apply_filters can still be NULL for a brief window right
+      # after a new session connects; ignoreNULL = FALSE (below) makes this
+      # fire on that first NULL too, so NULL has to be treated the same as
+      # 0 here.
+      if (is.null(input$apply_filters) || input$apply_filters == 0) {
         return(data.frame(
           pk_mediaid = integer(0),
           filename = character(0),
@@ -527,8 +532,8 @@ image_viewer_server <- function(id, selectedUser = reactive(NA), active = reacti
       i_photo(1)
       i_cache(1)
       photos
-    })
-    
+    }, ignoreNULL = FALSE)
+
     i_cache <- reactiveVal(1) # Initialize cache counter
     
     metadata_cache <- reactiveValues(

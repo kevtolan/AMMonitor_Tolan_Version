@@ -384,6 +384,28 @@ since they share a calling convention:
   read sees a valid (empty) value instead of an unfired reactive.
   Verified with the trial database: opening Model Verifications and
   leaving every filter at its default no longer logs any error at all.
+- The above wasn't quite the whole story: `input$apply_filters` (the
+  guard both fixes above rely on) can itself still be `NULL`, not `0`,
+  for a brief window right after a session connects -- specifically
+  whenever the button lives in UI that mounts a moment after the initial
+  page load (e.g. behind a dynamically-rendered module/tab), the
+  actionButton's own default value hasn't reached the server over the
+  websocket yet. `eventReactive()`'s default `ignoreNULL = TRUE` means it
+  simply does not fire at all while its trigger is `NULL` -- so during
+  that window `audio_avail()`/`photos_avail()` have no cached value
+  whatsoever (not even the empty placeholder), and reading them is back
+  to the original unfired-reactive/`shiny.silent.error` problem, just
+  narrowed from "until Apply Filters is clicked" down to "until the
+  button's own value syncs." This reproduced reliably against
+  `VPMon_AMM` (a much larger, slower-loading production project than the
+  trial database this was first verified against) despite testing clean
+  against the trial database beforehand -- a heavier session takes
+  longer to reach a steady state, giving this narrow window more chances
+  to actually get hit. Fixed by adding `ignoreNULL = FALSE` to both
+  `eventReactive`s and updating their guards to
+  `is.null(input$apply_filters) || input$apply_filters == 0`, so they
+  produce the same empty placeholder on that first `NULL` too instead of
+  staying unfired.
 
 ## Related database schema changes (not in this repo)
 

@@ -696,7 +696,16 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
     # throws, it just briefly reports zero rows, exactly like a filtered
     # search that matched nothing.
     audio_avail <- eventReactive(input$apply_filters, {
-      if (input$apply_filters == 0) {
+      # input$apply_filters can still be NULL for a brief window right after
+      # a new session connects (the actionButton's own value 0 hasn't
+      # reached the server over the websocket yet). With the default
+      # ignoreNULL = TRUE, eventReactive simply never fires while that's
+      # true, so audio_avail() has no cached value at all yet -- reading it
+      # anywhere in that window (e.g. nrow(audio_avail())) hits the exact
+      # same unfired-reactive/shiny.silent.error problem this whole guard
+      # exists to avoid. ignoreNULL = FALSE (below) makes it fire on that
+      # first NULL too, so this check has to treat NULL the same as 0.
+      if (is.null(input$apply_filters) || input$apply_filters == 0) {
         return(data.frame(
           pk_mediaid = integer(0),
           filename = character(0),
@@ -802,7 +811,7 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
       i_audio(1)
       i_cache(1)
       audios
-    })
+    }, ignoreNULL = FALSE)
 
     i_cache <- reactiveVal(1) # Initialize cache counter
 
