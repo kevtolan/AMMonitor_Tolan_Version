@@ -37,15 +37,31 @@ my_home_server <- function(id) {
     function(input, output, session) {
       
       con <<- reactiveVal(NA)
-      onStop(function() {
-        cat("Closing Database Connections")
-        isolate({
-          if (isS4(con())) {
-            DBI::dbDisconnect(con())
-          }
-          rm(con, envir = .GlobalEnv)
+      # onStop() is an app-level hook, not a per-session one: it fires once
+      # when the whole Shiny app process stops, regardless of how many
+      # sessions ever connected. my_home_server() runs once per session
+      # (once per browser reconnect/reload, since this is a single-user
+      # local app with one shared global `con`), so without this guard,
+      # every reconnect registers ANOTHER onStop() callback, and they all
+      # fire when the app finally stops -- printing "Closing Database
+      # Connections" once per reconnect instead of once per app run.
+      if (!isTRUE(getOption("ammonitor.onstop_registered"))) {
+        options(ammonitor.onstop_registered = TRUE)
+        onStop(function() {
+          # Reset the flag so the NEXT launchApp() call in this same R
+          # session (a common workflow -- stop the app, tweak something,
+          # relaunch, without restarting R) registers its own onStop()
+          # again instead of finding the flag still set from this run.
+          options(ammonitor.onstop_registered = FALSE)
+          cat("Closing Database Connections")
+          isolate({
+            if (isS4(con())) {
+              DBI::dbDisconnect(con())
+            }
+            rm(con, envir = .GlobalEnv)
+          })
         })
-      })
+      }
       
       user_first_name <- reactiveVal(character())
       

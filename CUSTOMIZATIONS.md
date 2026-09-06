@@ -433,6 +433,22 @@ since they share a calling convention:
   produce the same empty placeholder on that first `NULL` too instead of
   staying unfired.
 
+### `modules/my_home.R`
+
+- Fixed `"Closing Database Connections"` printing once per browser
+  reconnect instead of once per app run. `onStop()` is an app-level hook
+  (fires once when the whole Shiny process stops), not a per-session one,
+  but it was being registered inside `my_home_server()`, which runs once
+  per session -- every reconnect (a page reload, a second tab, repeated
+  testing) added another `onStop()` callback, and they all fired together
+  whenever the app actually stopped. Guarded registration with a
+  `getOption("ammonitor.onstop_registered")` flag so it only happens
+  once per app run; the flag resets back to `FALSE` inside the callback
+  itself so a subsequent `launchApp()` call in the same R session (stop,
+  tweak something, relaunch, without restarting R) registers its own
+  handler again instead of finding the flag still set from the previous
+  run.
+
 ## Related database schema changes (not in this repo)
 
 Live SQLite schema changes needed for the above, made via
