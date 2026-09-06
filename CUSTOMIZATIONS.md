@@ -373,6 +373,41 @@ since they share a calling convention:
   Model Verifications place `audio_player_ui()` directly, so its own
   internal `column(12, ...)` (see `audio_player.R` below) already gives
   it the full row on those tabs.
+- App-wide dark theme, applied via a global CSS block (there's no
+  toggle -- it's just always on). `dashboardPage(skin = "black")` gets
+  most of the way there for the sidebar, but AdminLTE's "black" skin
+  only ever darkens the sidebar by design -- the header/logo bar stays
+  its own light color regardless of skin, so that needed its own
+  override to look like one consistent theme rather than half-and-half.
+  Most plain text (headings, labels, paragraphs) needed no explicit
+  color rule at all: `color` is an inherited CSS property, so setting it
+  once on `body` covers anything that doesn't set its own color, and
+  only elements that set their *own* background (boxes, wellPanels,
+  inputs, tables, modals) needed matching foreground colors added.
+  Notable non-obvious fixes along the way:
+    - shinydashboard's `.box-header`/`.box-title` default text color
+      (a dark gray meant for a white box) was nearly unreadable against
+      the new dark box background -- needed its own override, not just
+      inheritance.
+    - `reactable` ships its own stylesheet (loaded as an htmlwidgets
+      dependency *after* this app's CSS), which sets `.rt-table`/`.rt-tr`
+      to a white background at the same specificity -- without
+      `!important` on this app's rules, reactable's own CSS wins on load
+      order alone and every table (Taxon Model Outputs, File Tags, etc.)
+      stayed white.
+    - A handful of modules (`my_home.R`, several `apps/*.R` and
+      `app_modules/*.R` instructional banners) hardcode a light
+      `wellPanel` background directly (`style = "background: skyblue"`,
+      `lightblue`, `aquamarine`) -- inline styles beat any external
+      stylesheet rule regardless of specificity, so fixing these needed
+      `[style*='background: skyblue']`-style attribute-selector
+      overrides with `!important`, added centrally here, rather than
+      editing every one of those files individually.
+  Does *not* touch the spectrogram/waveform plots themselves (rendered
+  server-side as ggplot images with their own selectable color palette)
+  or reach into modules this pass didn't specifically verify -- some
+  corner of the app not yet clicked through may still have an
+  unstyled light element.
 
 ### `server.R`
 

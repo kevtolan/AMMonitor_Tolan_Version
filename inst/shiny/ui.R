@@ -7,6 +7,7 @@ library(DBI)
 library(reactable)
 
 ui <- dashboardPage(
+  skin = "black",
   dashboardHeader(title = "AMMonitor"),
   dashboardSidebar(
     # https://fontawesome.com/icons?d=gallery&m=free
@@ -213,6 +214,149 @@ ui <- dashboardPage(
           margin-left: 172.5px;
         }
       }"
+    ),
+    tags$style(
+      # Dark theme. `body`'s own background/color covers most plain text
+      # for free via normal CSS inheritance (color is an inherited
+      # property, so headings/labels/paragraphs that don't set their own
+      # color pick this up automatically) -- the rules below only need to
+      # handle elements that set their OWN background (boxes, inputs,
+      # tables, wellPanels) and so need a matching foreground color too.
+      # Doesn't touch the spectrogram/waveform plots themselves (rendered
+      # server-side as ggplot images) or their own color-palette dropdown
+      # -- those keep whatever palette is selected there.
+      "
+      body, .content-wrapper, .right-side, .main-footer {
+        background-color: #1a1d21 !important;
+        color: #e8e8e8;
+      }
+      /* skin = 'black' (set on dashboardPage) only darkens the sidebar --
+         that's the actual AdminLTE design, the top header/logo bar stays
+         its own light color regardless of skin. Overridden here so the
+         whole chrome is consistently dark. */
+      .main-header .navbar, .main-header .logo, .main-header .logo:hover {
+        background-color: #17191c !important;
+        color: #e8e8e8 !important;
+      }
+      .main-header .navbar .sidebar-toggle {
+        color: #e8e8e8 !important;
+      }
+      .box-header, .box-title {
+        color: #e8e8e8 !important;
+      }
+      .input-group-addon {
+        background-color: #2b3035 !important;
+        color: #e8e8e8 !important;
+        border-color: #444a50 !important;
+      }
+      .modal-content {
+        background-color: #23272b;
+        color: #e8e8e8;
+      }
+      .modal-header, .modal-footer {
+        border-color: #3a3f44;
+      }
+      .box, .box-footer {
+        background-color: #23272b;
+        border-top-color: #3a3f44;
+        color: #e8e8e8;
+      }
+      .box-header .btn-box-tool {
+        color: #a8adb3;
+      }
+      .box-header .btn-box-tool:hover {
+        color: #ffffff;
+      }
+      .well {
+        background-color: #23272b !important;
+        border-color: #3a3f44;
+        color: #e8e8e8 !important;
+      }
+      .form-control,
+      .selectize-input,
+      select {
+        background-color: #2b3035 !important;
+        border-color: #444a50 !important;
+        color: #e8e8e8 !important;
+      }
+      .form-control::placeholder {
+        color: #8a8f94;
+      }
+      .selectize-dropdown, .selectize-dropdown-content {
+        background-color: #2b3035;
+        color: #e8e8e8;
+        border-color: #444a50;
+      }
+      .selectize-dropdown .option.active,
+      .selectize-dropdown-content .option.active {
+        background-color: #3a4046;
+      }
+      .selectize-input.focus {
+        border-color: #4da3ff !important;
+      }
+      /* !important throughout: reactable ships its own stylesheet
+         (loaded as an htmlwidgets dependency after this one), which sets
+         a white .rt-table/.rt-tr background at the same specificity --
+         without !important these rules just lose to load order. */
+      .rt-table {
+        background-color: #23272b !important;
+        color: #e8e8e8 !important;
+      }
+      .rt-thead .rt-th {
+        background-color: #2b3035 !important;
+        color: #e8e8e8 !important;
+        border-color: #3a3f44 !important;
+      }
+      .rt-tr {
+        border-color: #3a3f44 !important;
+      }
+      .rt-tr.-odd {
+        background-color: #23272b !important;
+      }
+      .rt-tr.-even {
+        background-color: #262b30 !important;
+      }
+      .rt-td {
+        border-color: #3a3f44 !important;
+      }
+      .nav-tabs-custom, .nav-tabs-custom > .tab-content {
+        background-color: #23272b;
+      }
+      .nav-tabs-custom > .nav-tabs > li.active > a {
+        background-color: #23272b;
+        color: #e8e8e8;
+        border-color: #3a3f44;
+      }
+      .nav-tabs-custom > .nav-tabs > li > a {
+        color: #a8adb3;
+      }
+      .btn-default {
+        background-color: #2b3035;
+        border-color: #444a50;
+        color: #e8e8e8;
+      }
+      .btn-default:hover {
+        background-color: #363c42;
+        color: #ffffff;
+      }
+      a {
+        color: #6cb6ff;
+      }
+      hr {
+        border-top-color: #3a3f44 !important;
+      }
+      /* A handful of modules use a hardcoded light wellPanel background
+         (skyblue/lightblue/aquamarine) as an instructional banner --
+         inline styles beat external stylesheet rules, so these need
+         their own !important overrides rather than relying on the
+         .well rule above. */
+      [style*='background: skyblue'], [style*='background:skyblue'],
+      [style*='background: lightblue'], [style*='background:lightblue'],
+      [style*='background: aquamarine'], [style*='background:aquamarine'] {
+        background-color: #2b3035 !important;
+        color: #e8e8e8 !important;
+      }
+      "
     ),
     tags$title("AMMonitor")
   )
