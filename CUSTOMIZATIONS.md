@@ -211,6 +211,15 @@ since they share a calling convention:
   multi-select was possible.
 - Default Spectrogram Frequency Range changed to 0-8 kHz; default
   Spectrogram Length changed to 20s.
+- Player/spectrogram section widened to the full page width
+  (`column(10, ...)` -> `column(12, ...)`). It sat directly below the
+  "Recording Filters & Settings" box, which already spans the full
+  `width = 12` row on its own -- as the next sibling in that same outer
+  `fluidRow`, the player column wrapped to a fresh row of its own instead
+  of sharing space with anything, so its old `width = 10` just left 2 of
+  12 grid columns (about a sixth of the page) unused on the right for no
+  reason. The spectrogram/waveform `plotOutput()`s were already
+  `width = "100%"` of their container, so this widens them too.
 - `audio_comment_box_ui()` extracted so the comment/detections box can be
   placed independently of the player (used across Player, Tagger,
   Annotation Verifications, and Model Verifications tabs).

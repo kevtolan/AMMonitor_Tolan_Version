@@ -337,7 +337,7 @@ audio_player_ui <- function(id, viewer_mode) {
         )
       ),
       column(
-        10,
+        12,
         textOutput(ns('audio_meta')),
         #player + spectro ---------------------
         fluidRow(
