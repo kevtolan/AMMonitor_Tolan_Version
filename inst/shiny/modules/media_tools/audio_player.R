@@ -1250,8 +1250,20 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
         inputId = 'manual_detx',
         value = as.character(display_value)
       )
-      output$manual_detx_save_status <- renderText("")
     })
+
+    # Clear the "Saved hh:mm:ss" status only when switching recordings. This is
+    # deliberately its own observer keyed on the recording id: the observer
+    # above also re-runs whenever the cached ManualDetx/model-output-count
+    # values change (including right after a save, since the save writes into
+    # the same combined metadata_cache$cache field that current_model_output_count()
+    # reads from), and if it blanked the status text too, that would clobber
+    # the "Saved hh:mm:ss" message within the same reactive flush that just
+    # set it below -- which is why the message previously only appeared on a
+    # second click.
+    observeEvent(audio_avail()$pk_mediaid[i_audio()], {
+      output$manual_detx_save_status <- renderText("")
+    }, ignoreNULL = FALSE)
 
     # Save the (possibly overwritten) detection count back to media.ManualDetx.
     # Clearing the box back to blank and saving reverts it to NULL, so the
@@ -2067,9 +2079,27 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
         # fails assigning into the (correctly) 0-row reference_rects
         # below with "replacement has 1 row, data has 0".
         reference_labels <- if (length(reference_mask)) {
+          these_ids <- reference_source$pk_modeloutputid[reference_mask]
+          # A modeloutput with no matching row here hasn't been reviewed
+          # yet, so it's left unmarked (the common case); one verified
+          # invalid takes priority over a verified valid if somehow both
+          # are present for the same output.
+          verif_tag <- vapply(these_ids, function(this_id) {
+            is_valid <- metadata_cache$cache$modelverifications$is_valid[
+              metadata_cache$cache$modelverifications$fk_modeloutputid == this_id
+            ]
+            if (!length(is_valid)) {
+              ""
+            } else if (any(is_valid == 0, na.rm = TRUE)) {
+              " ✗ rejected"
+            } else {
+              " ✓ verified"
+            }
+          }, character(1))
           paste0(
             reference_source$fk_taxonid[reference_mask],
-            " (", round(reference_source$value_num[reference_mask], 2), ")"
+            " (", round(reference_source$value_num[reference_mask], 2), ")",
+            verif_tag
           )
         } else {
           character(0)

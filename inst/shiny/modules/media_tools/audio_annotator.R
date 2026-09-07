@@ -157,6 +157,15 @@ audio_annotator_server <- function(id, selectedUser = reactive(NA), audio_name, 
         inputId = 'manual_detx',
         value = as.character(display_value)
       )
+    })
+
+    # Clear the "Saved hh:mm:ss" status only when switching recordings. This is
+    # deliberately its own observer keyed on audio_name(): the observer above
+    # also re-runs when just_saved() changes (i.e. right after a save), and if
+    # it blanked the status text too, that would clobber the "Saved hh:mm:ss"
+    # message within the same reactive flush that just set it below -- which
+    # is why the message previously only appeared on a second click.
+    observeEvent(audio_name(), {
       output$manual_detx_save_status <- renderText("")
     })
 

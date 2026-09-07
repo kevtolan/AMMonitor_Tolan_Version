@@ -282,6 +282,44 @@ since they share a calling convention:
   `reference_rects$label` a few lines later. Guarded both branches with
   `if (length(reference_mask)) ... else character(0)` instead of relying
   on `paste0()` alone.
+  The Tagger branch's label now also appends a verification-status
+  indicator per box: `" ✓ verified"` if the modeloutput has a
+  `modelverifications` row with `is_valid == 1`, `" ✗ rejected"` if any
+  matching row has `is_valid == 0`, or nothing if it hasn't been
+  verified at all yet (the common case, left unmarked so the majority
+  of boxes stay uncluttered). Looked up per-box via `vapply()` over
+  `metadata_cache$cache$modelverifications` keyed on
+  `pk_modeloutputid`/`fk_modeloutputid`; a rejection takes priority over
+  a valid verification if a given output somehow has both. Not added to
+  the Model Verifier branch -- manual annotations there have no
+  equivalent "verified/rejected" concept of their own.
+- Both copies of the "Save Detections" button/`Saved hh:mm:ss` status
+  text (Tagger's own box in `audio_annotator.R`, and the shared
+  Player/Tagger/Verifier/Model-Outputs box in `audio_player.R`) only
+  showed the "Saved ..." confirmation on every *second* click, not the
+  first. Root cause: the observer that loads the current recording's
+  `ManualDetx` value into the box also unconditionally cleared
+  `output$manual_detx_save_status` on every run, and it re-runs not
+  just on recording change but also right after a save -- because it
+  reads `current_model_output_count()`/the cached `ManualDetx` value,
+  both of which live under the same combined `metadata_cache$cache`
+  field the save handler just wrote into (a `reactiveValues` field
+  invalidates as a whole, not per nested sub-element, so writing
+  `metadata_cache$cache$mediaMetaData$ManualDetx[...]` invalidates
+  every other reader of `$cache` too). That re-run executed within the
+  same reactive flush as the save, immediately blanking the "Saved
+  hh:mm:ss" text the save handler had just set -- and only stopped
+  happening on a second click because `reactiveValues`/`reactiveVal`
+  skip invalidating dependents when the newly assigned value is
+  `identical()` to the previous one (true on a second save of the same
+  number, false on the first, real change). Fixed by splitting the
+  status-clearing into its own observer keyed only on the recording
+  identity (`audio_name()` in `audio_annotator.R`;
+  `audio_avail()$pk_mediaid[i_audio()]` in `audio_player.R`), decoupled
+  from the value-loading observer entirely, so a save no longer
+  re-triggers it. Verified via temporary `cat()` instrumentation tracing
+  observer execution order/timing plus DB reads confirming the write,
+  live in the browser, before removing the instrumentation.
 - The `"Warning: Un-applied filters selected..."` banner
   (`output$filters_applied`) has a hardcoded yellow background
   (`#filters_applied {background-color: yellow; ...}`); its text color
