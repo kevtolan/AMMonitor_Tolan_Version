@@ -239,6 +239,28 @@ since they share a calling convention:
   page (not a plot background), and ggplot's default axis text color
   (near-black) had become unreadable. Same change in `image_viewer.R`
   isn't needed -- photos have no axes to label.
+- Tagger's spectrogram (`plotx`) can overlay faint boxes marking existing
+  model outputs for the current window (`fk_mediaid`/time/frequency
+  filtered from `metadata_cache$cache$modeloutputs`, same shift-by-
+  `startTime()` treatment as the manual-annotation `rects2`/pending
+  `rects` boxes it's drawn alongside), each labelled with its species and
+  score (`"Wood Frog (13.42)"`, semi-transparent orange text just above
+  the box) -- so a human tagger can see at a glance where the model
+  already flagged something (and how confidently) before adding a new
+  manual detection over the same call, rather than double-counting it.
+  Deliberately kept as its own `geom_rect`/`geom_text` layer rather than
+  merged into `current_taxon_annotations()` -- these boxes are read-only
+  reference, not something meant to be selected/edited/deleted the way
+  the tagger's own annotations are.
+  Toggled by the existing "Show Model Outputs" checkbox
+  (`checkboxInput('viewModelOutputs', ...)`), previously only rendered
+  for `viewer_mode == "viewer"` (where checking it does something
+  different -- merges model outputs directly into
+  `current_taxon_annotations()` for display in that mode's own table/
+  plot) -- extended to also render for `viewer_mode == "tagger"`, where
+  `plotx`'s render checks `viewer_mode == "tagger" && isTRUE(input$
+  viewModelOutputs)` to decide whether to build this overlay at all.
+  Defaults to unchecked/hidden in both modes.
 - The `"Warning: Un-applied filters selected..."` banner
   (`output$filters_applied`) has a hardcoded yellow background
   (`#filters_applied {background-color: yellow; ...}`); its text color

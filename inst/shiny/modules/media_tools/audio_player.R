@@ -301,7 +301,7 @@ audio_player_ui <- function(id, viewer_mode) {
                   choices = list(Black = "#000000", Blue = "#006DDB", Red = "#A50021", Green = "#004949", Brown = "#662700", Orange = "#DB6D00", Pink = "#FF6DB6", Purple = "#490092"),
                   selected = "Black"
                 ),
-                {if (viewer_mode == "viewer") {
+                {if (viewer_mode %in% c("viewer", "tagger")) {
                   checkboxInput(
                     inputId = ns('viewModelOutputs'),
                     label = 'Show Model Outputs',
@@ -2028,7 +2028,59 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
           current_taxon_annotations()$is_delete == 0
       ), c("fk_taxonid", "selected_row")])
 
+      # Faint existing-model-output boxes (+ species/score label just above
+      # each one), Tagger only, toggled by the (Tagger-only) "Show Model
+      # Outputs" checkbox: lets a human tagger see at a glance where the
+      # model already flagged something (and what/how confidently) in this
+      # window, so they don't re-tag the same call as a "new" manual
+      # detection. Deliberately a separate geom_rect/geom_text from rects2
+      # (manual annotations) rather than merged into the same
+      # taxon_annotations set -- these are for reference/context only, not
+      # something the tagger is meant to interact with the way their own
+      # boxes work.
+      if (viewer_mode == "tagger" && isTRUE(input$viewModelOutputs)) {
+        model_output_mask <- which(
+          metadata_cache$cache$modeloutputs$fk_mediaid == audio_avail()$pk_mediaid[i_audio()] &
+            metadata_cache$cache$modeloutputs$x_min >= startTime() &
+            metadata_cache$cache$modeloutputs$x_max <= (startTime() + input$specLength) &
+            (metadata_cache$cache$modeloutputs$y_min >= spec_range[1]) %in% c(1, NA) &
+            (metadata_cache$cache$modeloutputs$y_max <= spec_range[2]) %in% c(1, NA)
+        )
+      } else {
+        model_output_mask <- integer(0)
+      }
+      model_output_rects <- metadata_cache$cache$modeloutputs[model_output_mask, c("x_min", "y_min", "x_max", "y_max")]
+      # taxon/value_num kept separate from model_output_rects until after the
+      # time-shift below, which treats the whole data.frame as a numeric
+      # matrix -- a character column (fk_taxonid) mixed in would break that.
+      model_output_labels <- metadata_cache$cache$modeloutputs[model_output_mask, c("fk_taxonid", "value_num")]
+
+      model_output_rects$y_min <- ifelse(is.na(model_output_rects$y_min), spec_range[1], model_output_rects$y_min)
+      model_output_rects$y_max <- ifelse(is.na(model_output_rects$y_max), spec_range[2], model_output_rects$y_max)
+
+      if (nrow(model_output_rects)) {
+        model_output_rects <- model_output_rects - t(matrix(rep(c(startTime(),0,startTime(),0), nrow(model_output_rects)), nrow = 4))
+      }
+
+      model_output_rects <- cbind(model_output_rects, model_output_labels)
+
       ggplot() +
+        geom_rect(
+          data = model_output_rects,
+          aes(xmin = x_min, ymin = y_min, xmax = x_max, ymax = y_max),
+          fill = "transparent",
+          color = "orange",
+          alpha = 0.4
+        ) +
+        geom_text(
+          data = model_output_rects,
+          aes(x = x_min, y = y_max, label = paste0(fk_taxonid, " (", round(value_num, 2), ")")),
+          color = "orange",
+          alpha = 0.7,
+          size = 3,
+          hjust = "left",
+          vjust = "bottom"
+        ) +
         geom_rect(
           data = rects2,
           aes(xmin = x_min, ymin = y_min, xmax = x_max, ymax = y_max, linewidth = factor(selected_row)),
