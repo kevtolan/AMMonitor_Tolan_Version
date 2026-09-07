@@ -269,6 +269,19 @@ since they share a calling convention:
   reference boxes there); unchanged (off) for `"viewer"`, where checking
   it does the more involved annotations-merge behavior. Label text size
   doubled (`size = 6`, was `3`) for legibility.
+  Fixed a crash ("replacement has 1 row, data has 0") that surfaced
+  once this overlay defaulted to on: `reference_labels` was built with
+  `paste0(reference_source$fk_taxonid[reference_mask], " (", ..., ")")`,
+  and whenever `reference_mask` was empty (the ordinary case of a window
+  with no existing model outputs/annotations to reference), `paste0()`
+  doesn't return `character(0)` here the way it would with only
+  zero-length inputs -- with literal length-1 strings like `" ("`/`")"`
+  also in the call, it recycles the zero-length input up to length 1
+  instead, silently producing one `" ()"` label rather than none. That
+  length-1 result then failed to assign into the correctly-0-row
+  `reference_rects$label` a few lines later. Guarded both branches with
+  `if (length(reference_mask)) ... else character(0)` instead of relying
+  on `paste0()` alone.
 - The `"Warning: Un-applied filters selected..."` banner
   (`output$filters_applied`) has a hardcoded yellow background
   (`#filters_applied {background-color: yellow; ...}`); its text color

@@ -2058,10 +2058,22 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
             (metadata_cache$cache$modeloutputs$y_max <= spec_range[2]) %in% c(1, NA)
         )
         reference_source <- metadata_cache$cache$modeloutputs
-        reference_labels <- paste0(
-          reference_source$fk_taxonid[reference_mask],
-          " (", round(reference_source$value_num[reference_mask], 2), ")"
-        )
+        # length(reference_mask) guard, not just relying on paste0() to
+        # produce character(0) on its own: paste0() recycles a
+        # zero-length input up to the length of its OTHER arguments when
+        # those are literal length-1 strings (like " (" and ")" here),
+        # so with zero matches this would otherwise silently produce a
+        # single " ()" label instead of no labels at all -- which then
+        # fails assigning into the (correctly) 0-row reference_rects
+        # below with "replacement has 1 row, data has 0".
+        reference_labels <- if (length(reference_mask)) {
+          paste0(
+            reference_source$fk_taxonid[reference_mask],
+            " (", round(reference_source$value_num[reference_mask], 2), ")"
+          )
+        } else {
+          character(0)
+        }
       } else if (viewer_mode == "modelOutputs" && isTRUE(input$viewModelOutputs)) {
         reference_mask <- which(
           metadata_cache$cache$annotations$fk_mediaid == audio_avail()$pk_mediaid[i_audio()] &
@@ -2073,11 +2085,17 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
         )
         reference_source <- metadata_cache$cache$annotations
         # No numeric score for a human annotation -- show who made it
-        # instead (the closest analog to "how confident").
-        reference_labels <- paste0(
-          reference_source$fk_taxonid[reference_mask],
-          " (", reference_source$fk_personid[reference_mask], ")"
-        )
+        # instead (the closest analog to "how confident"). Same
+        # length(reference_mask) guard as the tagger branch above, and
+        # for the same reason.
+        reference_labels <- if (length(reference_mask)) {
+          paste0(
+            reference_source$fk_taxonid[reference_mask],
+            " (", reference_source$fk_personid[reference_mask], ")"
+          )
+        } else {
+          character(0)
+        }
       } else {
         reference_mask <- integer(0)
         # Any data.frame with the same x_min/y_min/x_max/y_max columns
