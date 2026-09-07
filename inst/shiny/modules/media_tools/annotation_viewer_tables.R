@@ -497,9 +497,7 @@ annotation_viewer_tables_server <- function(id, selectedUser = reactive(NA), act
             value_num = colDef(format = colFormat(digits = 2))
           ),
           sortable = FALSE,
-          groupBy = 'pk_annotationid',
-          defaultExpanded = TRUE,
-          selection = "single", 
+          selection = "single",
           onClick = "select"
         )
       )

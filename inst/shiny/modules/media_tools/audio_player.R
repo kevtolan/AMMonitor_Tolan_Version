@@ -301,11 +301,21 @@ audio_player_ui <- function(id, viewer_mode) {
                   choices = list(Black = "#000000", Blue = "#006DDB", Red = "#A50021", Green = "#004949", Brown = "#662700", Orange = "#DB6D00", Pink = "#FF6DB6", Purple = "#490092"),
                   selected = "Black"
                 ),
-                {if (viewer_mode %in% c("viewer", "tagger")) {
+                {if (viewer_mode %in% c("viewer", "tagger", "modelOutputs")) {
                   checkboxInput(
                     inputId = ns('viewModelOutputs'),
-                    label = 'Show Model Outputs',
-                    value = FALSE
+                    # modelOutputs mode shows the opposite reference overlay
+                    # (manual annotations, since the page's own primary
+                    # boxes are already model outputs), so the label flips
+                    # to match what checking it actually does there.
+                    label = if (viewer_mode == "modelOutputs") 'Show Manual Annotations' else 'Show Model Outputs',
+                    # Tagger/modelOutputs default this on (read-only
+                    # reference boxes in both, on by default is the useful
+                    # case); viewer mode keeps its original off-by-default --
+                    # checking it there does something more involved (merges
+                    # model outputs into current_taxon_annotations() for
+                    # display), not just an overlay toggle.
+                    value = (viewer_mode %in% c("tagger", "modelOutputs"))
                   )
                 }}
               ),
@@ -2028,56 +2038,79 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
           current_taxon_annotations()$is_delete == 0
       ), c("fk_taxonid", "selected_row")])
 
-      # Faint existing-model-output boxes (+ species/score label just above
-      # each one), Tagger only, toggled by the (Tagger-only) "Show Model
-      # Outputs" checkbox: lets a human tagger see at a glance where the
-      # model already flagged something (and what/how confidently) in this
-      # window, so they don't re-tag the same call as a "new" manual
-      # detection. Deliberately a separate geom_rect/geom_text from rects2
-      # (manual annotations) rather than merged into the same
-      # taxon_annotations set -- these are for reference/context only, not
-      # something the tagger is meant to interact with the way their own
-      # boxes work.
+      # Faint reference boxes (+ label just above each one) showing what
+      # the OTHER side already found in this window: existing model
+      # outputs on Tagger (so a human doesn't re-tag the same call as a
+      # "new" manual detection), existing manual annotations on Model
+      # Verifier (so a reviewer can see a human already confirmed this
+      # call, independent of the model output being reviewed). Toggled by
+      # the "Show Model Outputs"/"Show Manual Annotations" checkbox.
+      # Deliberately separate geom_rect/geom_text layers from rects2 (this
+      # viewer_mode's own primary boxes) rather than merged into the same
+      # taxon_annotations set -- read-only reference, not something meant
+      # to be selected/edited/deleted the way rects2's own boxes are.
       if (viewer_mode == "tagger" && isTRUE(input$viewModelOutputs)) {
-        model_output_mask <- which(
+        reference_mask <- which(
           metadata_cache$cache$modeloutputs$fk_mediaid == audio_avail()$pk_mediaid[i_audio()] &
             metadata_cache$cache$modeloutputs$x_min >= startTime() &
             metadata_cache$cache$modeloutputs$x_max <= (startTime() + input$specLength) &
             (metadata_cache$cache$modeloutputs$y_min >= spec_range[1]) %in% c(1, NA) &
             (metadata_cache$cache$modeloutputs$y_max <= spec_range[2]) %in% c(1, NA)
         )
+        reference_source <- metadata_cache$cache$modeloutputs
+        reference_labels <- paste0(
+          reference_source$fk_taxonid[reference_mask],
+          " (", round(reference_source$value_num[reference_mask], 2), ")"
+        )
+      } else if (viewer_mode == "modelOutputs" && isTRUE(input$viewModelOutputs)) {
+        reference_mask <- which(
+          metadata_cache$cache$annotations$fk_mediaid == audio_avail()$pk_mediaid[i_audio()] &
+            metadata_cache$cache$annotations$is_delete == 0 &
+            metadata_cache$cache$annotations$x_min >= startTime() &
+            metadata_cache$cache$annotations$x_max <= (startTime() + input$specLength) &
+            (metadata_cache$cache$annotations$y_min >= spec_range[1]) %in% c(1, NA) &
+            (metadata_cache$cache$annotations$y_max <= spec_range[2]) %in% c(1, NA)
+        )
+        reference_source <- metadata_cache$cache$annotations
+        # No numeric score for a human annotation -- show who made it
+        # instead (the closest analog to "how confident").
+        reference_labels <- paste0(
+          reference_source$fk_taxonid[reference_mask],
+          " (", reference_source$fk_personid[reference_mask], ")"
+        )
       } else {
-        model_output_mask <- integer(0)
+        reference_mask <- integer(0)
+        # Any data.frame with the same x_min/y_min/x_max/y_max columns
+        # works here -- indexing zero rows means its other columns are
+        # never touched.
+        reference_source <- metadata_cache$cache$modeloutputs
+        reference_labels <- character(0)
       }
-      model_output_rects <- metadata_cache$cache$modeloutputs[model_output_mask, c("x_min", "y_min", "x_max", "y_max")]
-      # taxon/value_num kept separate from model_output_rects until after the
-      # time-shift below, which treats the whole data.frame as a numeric
-      # matrix -- a character column (fk_taxonid) mixed in would break that.
-      model_output_labels <- metadata_cache$cache$modeloutputs[model_output_mask, c("fk_taxonid", "value_num")]
+      reference_rects <- reference_source[reference_mask, c("x_min", "y_min", "x_max", "y_max")]
 
-      model_output_rects$y_min <- ifelse(is.na(model_output_rects$y_min), spec_range[1], model_output_rects$y_min)
-      model_output_rects$y_max <- ifelse(is.na(model_output_rects$y_max), spec_range[2], model_output_rects$y_max)
+      reference_rects$y_min <- ifelse(is.na(reference_rects$y_min), spec_range[1], reference_rects$y_min)
+      reference_rects$y_max <- ifelse(is.na(reference_rects$y_max), spec_range[2], reference_rects$y_max)
 
-      if (nrow(model_output_rects)) {
-        model_output_rects <- model_output_rects - t(matrix(rep(c(startTime(),0,startTime(),0), nrow(model_output_rects)), nrow = 4))
+      if (nrow(reference_rects)) {
+        reference_rects <- reference_rects - t(matrix(rep(c(startTime(),0,startTime(),0), nrow(reference_rects)), nrow = 4))
       }
 
-      model_output_rects <- cbind(model_output_rects, model_output_labels)
+      reference_rects$label <- reference_labels
 
       ggplot() +
         geom_rect(
-          data = model_output_rects,
+          data = reference_rects,
           aes(xmin = x_min, ymin = y_min, xmax = x_max, ymax = y_max),
           fill = "transparent",
           color = "orange",
           alpha = 0.4
         ) +
         geom_text(
-          data = model_output_rects,
-          aes(x = x_min, y = y_max, label = paste0(fk_taxonid, " (", round(value_num, 2), ")")),
+          data = reference_rects,
+          aes(x = x_min, y = y_max, label = label),
           color = "orange",
           alpha = 0.7,
-          size = 3,
+          size = 6,
           hjust = "left",
           vjust = "bottom"
         ) +

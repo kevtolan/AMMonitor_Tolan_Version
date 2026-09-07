@@ -239,28 +239,36 @@ since they share a calling convention:
   page (not a plot background), and ggplot's default axis text color
   (near-black) had become unreadable. Same change in `image_viewer.R`
   isn't needed -- photos have no axes to label.
-- Tagger's spectrogram (`plotx`) can overlay faint boxes marking existing
-  model outputs for the current window (`fk_mediaid`/time/frequency
-  filtered from `metadata_cache$cache$modeloutputs`, same shift-by-
-  `startTime()` treatment as the manual-annotation `rects2`/pending
-  `rects` boxes it's drawn alongside), each labelled with its species and
-  score (`"Wood Frog (13.42)"`, semi-transparent orange text just above
-  the box) -- so a human tagger can see at a glance where the model
-  already flagged something (and how confidently) before adding a new
-  manual detection over the same call, rather than double-counting it.
-  Deliberately kept as its own `geom_rect`/`geom_text` layer rather than
-  merged into `current_taxon_annotations()` -- these boxes are read-only
-  reference, not something meant to be selected/edited/deleted the way
-  the tagger's own annotations are.
+- The spectrogram (`plotx`) can overlay faint boxes showing what the
+  *other side* already found in this window -- existing model outputs on
+  Tagger, existing manual annotations on Model Verifier -- each labelled
+  just above the box (`"Wood Frog (13.42)"` on Tagger, the score; `"Wood
+  Frog (ktolan)"` on Model Verifier, who annotated it, since a human
+  annotation has no numeric confidence to show). Lets whoever's reviewing
+  see at a glance that the other side already flagged/confirmed this
+  call before adding a new one over the same detection, rather than
+  double-counting it. Built from `reference_rects`/`reference_labels`,
+  filtered by `fk_mediaid`/time/frequency from `metadata_cache$cache$
+  modeloutputs` (Tagger) or `metadata_cache$cache$annotations`
+  (Model Verifier, also excluding `is_delete == 1`), with the same
+  shift-by-`startTime()` treatment as the manual-annotation `rects2`/
+  pending `rects` boxes it's drawn alongside. Deliberately kept as its
+  own `geom_rect`/`geom_text` layer rather than merged into
+  `current_taxon_annotations()` -- read-only reference, not something
+  meant to be selected/edited/deleted the way each mode's own primary
+  boxes are.
   Toggled by the existing "Show Model Outputs" checkbox
   (`checkboxInput('viewModelOutputs', ...)`), previously only rendered
   for `viewer_mode == "viewer"` (where checking it does something
   different -- merges model outputs directly into
   `current_taxon_annotations()` for display in that mode's own table/
-  plot) -- extended to also render for `viewer_mode == "tagger"`, where
-  `plotx`'s render checks `viewer_mode == "tagger" && isTRUE(input$
-  viewModelOutputs)` to decide whether to build this overlay at all.
-  Defaults to unchecked/hidden in both modes.
+  plot) -- extended to also render for `"tagger"` and `"modelOutputs"`,
+  relabelled `"Show Manual Annotations"` for the latter since checking it
+  there does the opposite of what it does on Tagger. Defaults *on* for
+  Tagger and Model Verifier (the useful case, since these are read-only
+  reference boxes there); unchanged (off) for `"viewer"`, where checking
+  it does the more involved annotations-merge behavior. Label text size
+  doubled (`size = 6`, was `3`) for legibility.
 - The `"Warning: Un-applied filters selected..."` banner
   (`output$filters_applied`) has a hardcoded yellow background
   (`#filters_applied {background-color: yellow; ...}`); its text color
@@ -345,6 +353,17 @@ since they share a calling convention:
   multi-select enabled for audio (was single-select), with a slightly
   darker highlight on selected rows; click-and-drag range selection across
   rows.
+- Audio's "Taxon Tags" table (Tagger/Annotation Verifications/Player --
+  `tagger-audio`/`verifier-audio`/`viewer-audio`) no longer groups rows
+  by `pk_annotationid` with `defaultExpanded = TRUE`. That grouping made
+  each annotation collapse to a single summary row (`"2636 (1)"`) that
+  had to be expanded to see its own start/end time, frequency range, etc.
+  on a second line -- removed `groupBy`/`defaultExpanded` so every
+  annotation is just one row with all of its columns, matching how the
+  "Taxon Model Outputs" table already displays. (The equivalent photo
+  table -- `tagger-photo`/`verifier-photo`/`viewer-photo` -- still groups
+  by annotation, since annotags genuinely nest under a photo annotation
+  in a way that wasn't in scope here.)
 - Flag shown above the table when the current recording has manual (human)
   annotations, so a model-output reviewer knows tagger activity exists on
   this file even though the table itself only shows model detections.
