@@ -1,13 +1,16 @@
-#' @name testThreshold
+#' @name testThresholdRec
 #' @title Recording-level precision/recall/F1 across model-output score thresholds
-#' @description \code{testThreshold} sweeps a range of \code{modeloutputs}
+#' @description \code{testThresholdRec} sweeps a range of \code{modeloutputs}
 #' score thresholds for a given taxon/model set and, at each one, computes a
 #' recording-level confusion matrix (true/false positives/negatives) and the
 #' resulting precision, recall, F1, accuracy, and error rate. Useful for
 #' picking a score threshold for a template/model: raising it trades recall
 #' for precision (fewer false alarms to manually reject, but a few more real
 #' detections missed), and this shows exactly where that tradeoff lands
-#' across a range of candidate cutoffs.
+#' across a range of candidate cutoffs. A whole recording counts as one
+#' unit here regardless of how many individual detections it holds; see
+#' \code{\link{testThresholdDetx}} for the individual-detection-level
+#' version of this same analysis.
 #' @param con An open database connection.
 #' @param model_ids Vector of \code{fk_modelid} values (from the models
 #' table) to include -- e.g. the model(s) trained/run for a particular
@@ -53,7 +56,7 @@
 #' conx <- dbSetCon(file.path(demo_fp, "database", "demo.sqlite"))
 #'
 #' # sweep score thresholds for a given model/taxon
-#' result <- testThreshold(
+#' result <- testThresholdRec(
 #'   con = conx,
 #'   model_ids = 6,
 #'   taxon_id = "oven"
@@ -73,7 +76,7 @@
 #'
 #' }
 
-testThreshold <- function(con, model_ids, taxon_id, thresholds = NULL, make_plot = TRUE) {
+testThresholdRec <- function(con, model_ids, taxon_id, thresholds = NULL, make_plot = TRUE) {
 
   wf_outputs_all <- DBI::dbGetQuery(
     con,

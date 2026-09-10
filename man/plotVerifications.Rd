@@ -98,6 +98,7 @@ unlink(demo_fp, recursive = TRUE)
 }
 \seealso{
 Other classifier: 
-\code{\link{testThreshold}()}
+\code{\link{testThresholdDetx}()},
+\code{\link{testThresholdRec}()}
 }
 \concept{classifier}

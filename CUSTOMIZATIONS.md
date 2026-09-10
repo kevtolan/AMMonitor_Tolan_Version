@@ -112,32 +112,35 @@ since they share a calling convention:
 
 ## New package functions -- classifier threshold sensitivity
 
-- **`R/testThreshold.R`** -- sweeps a range of `modeloutputs` score
-  thresholds for a given `taxon_id`/`model_ids`, and at each one computes a
-  recording-level confusion matrix (TP/FP/TN/FN) plus precision, recall,
-  F1, accuracy, and error rate, so a template/model's score threshold can
-  be picked by seeing exactly where the precision/recall tradeoff lands
-  across candidate cutoffs. Tagged `@family classifier` alongside
-  `plotVerifications()`. Ground truth per recording, in priority order:
-  `media.ManualDetx` (a manual detection-count override some projects add
-  to their `media` table -- not part of the standard schema, so only used
-  if `DBI::dbListFields()` shows the column actually exists in this
-  database) if not NA; otherwise, for a recording with a qualifying
-  modeloutput, whether any of them were accepted in `modelverifications`
-  (unverified or verified valid, not all rejected); otherwise, for a
-  recording with none, a manual `annotations` entry for `taxon_id` (a false
-  negative) or `"no-species"` (a true negative). Recordings matching none
-  of these are excluded from that threshold's confusion matrix.
-  `thresholds` defaults to 17 evenly-spaced values spanning the observed
-  score range for that taxon/model set, since score scales vary widely
-  across model types (e.g. 0-1 BirdNET confidence vs. tens for monitoR
-  binary-template scores) -- no single hardcoded default range would make
-  sense across models. Originally written ad hoc for Wood Frog templates
-  in a personal analysis script (`myfunctions.R`/`testThreshold()`,
-  hardcoded to `taxon = "Wood Frog"`/`model_ids = c(4, 5)`, using dplyr);
-  integrated here as a general package function with `model_ids`/
-  `taxon_id` as required arguments, rewritten in base R (`merge`/`tapply`)
-  since dplyr/tidyr aren't package dependencies (only ggplot2 already is).
+- **`R/testThresholdRec.R`** (originally `testThreshold()`, renamed once
+  its detection-level sibling below was added) -- sweeps a range of
+  `modeloutputs` score thresholds for a given `taxon_id`/`model_ids`, and
+  at each one computes a **recording-level** confusion matrix (TP/FP/TN/FN
+  -- a whole recording is one unit, regardless of how many individual
+  detections it holds) plus precision, recall, F1, accuracy, and error
+  rate, so a template/model's score threshold can be picked by seeing
+  exactly where the precision/recall tradeoff lands across candidate
+  cutoffs. Tagged `@family classifier` alongside `plotVerifications()`.
+  Ground truth per recording, in priority order: `media.ManualDetx` (a
+  manual detection-count override some projects add to their `media`
+  table -- not part of the standard schema, so only used if
+  `DBI::dbListFields()` shows the column actually exists in this database)
+  if not NA; otherwise, for a recording with a qualifying modeloutput,
+  whether any of them were accepted in `modelverifications` (unverified
+  or verified valid, not all rejected); otherwise, for a recording with
+  none, a manual `annotations` entry for `taxon_id` (a false negative) or
+  `"no-species"` (a true negative). Recordings matching none of these are
+  excluded from that threshold's confusion matrix. `thresholds` defaults
+  to 17 evenly-spaced values spanning the observed score range for that
+  taxon/model set, since score scales vary widely across model types
+  (e.g. 0-1 BirdNET confidence vs. tens for monitoR binary-template
+  scores) -- no single hardcoded default range would make sense across
+  models. Originally written ad hoc for Wood Frog templates in a personal
+  analysis script (`myfunctions.R`/`testThreshold()`, hardcoded to
+  `taxon = "Wood Frog"`/`model_ids = c(4, 5)`, using dplyr); integrated
+  here as a general package function with `model_ids`/`taxon_id` as
+  required arguments, rewritten in base R (`merge`/`tapply`) since
+  dplyr/tidyr aren't package dependencies (only ggplot2 already is).
   Verified against three real/demo databases (VPMon_AMM's Wood Frog
   templates, VCE_AMm_DB_trial's BirdNET-scored American Bittern, and the
   package's own `ammCreateMiniDemo()` fixture) to confirm correct behavior
@@ -146,6 +149,32 @@ since they share a calling convention:
   `scale_color_manual()` palette (`precision = "#F6511D"`,
   `recall = "#FFB400"`, `f1 = "#00A6ED"`) instead of ggplot2's default
   discrete hues, per request.
+- **`R/testThresholdDetx.R`** -- same idea, but at the **detection**
+  level: each individual `modeloutputs` row (one scored time window) is
+  its own unit, rather than a whole recording. A qualifying detection
+  (score >= threshold) is a TP if verified valid, an FP if verified
+  invalid, and excluded entirely if unverified -- unlike
+  `testThresholdRec`, an unverified individual detection is *not* assumed
+  correct, since assuming every unverified call is right would inflate TP
+  with no real evidence behind it. FN comes from a source independent of
+  modeloutputs entirely: each `annotations` row of `taxon_id` is its own
+  real event with its own time window, and counts as missed if no
+  accepted modeloutput (score >= threshold, unverified or verified valid)
+  in the same recording overlaps its `x_min`/`x_max`. No true negative or
+  accuracy/error rate is reported here -- unlike a whole recording, an
+  empty stretch of time with no detection and no annotation isn't a
+  discrete, countable event, so TN has no natural detection-level
+  definition. `media.ManualDetx` isn't used here either, for the same
+  reason: it's a whole-recording count with no per-event time window, so
+  it has no role at the detection level. Confirmed against VPMon_AMM's
+  Wood Frog templates (recall is meaningfully lower than
+  `testThresholdRec`'s at the same thresholds, exactly as expected: a
+  recording can have an accepted detection *somewhere* in it without that
+  detection actually overlapping a given real call, which
+  `testThresholdRec`'s whole-recording ground truth can't distinguish but
+  this can) and the package's own `ammCreateMiniDemo()` fixture (including
+  the zero-detections-at-a-threshold edge case, which correctly returns
+  `NaN` precision/recall rather than erroring).
 
 ## Bug fixes to existing package functions
 
