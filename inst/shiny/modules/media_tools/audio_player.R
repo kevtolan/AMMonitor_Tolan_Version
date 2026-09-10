@@ -2150,8 +2150,15 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
           data = reference_rects,
           aes(xmin = x_min, ymin = y_min, xmax = x_max, ymax = y_max),
           fill = "transparent",
-          color = "orange",
-          alpha = 0.4
+          # A fixed (non-aes) `alpha` on geom_rect applies to fill *and*
+          # color alike via scales::alpha(), which for the literal color
+          # "transparent" discards its own built-in zero alpha and
+          # re-applies the given one to its underlying RGB (white) --
+          # scales::alpha("transparent", 0.4) is "#FFFFFF66", a
+          # translucent *white* wash, not a clear box. Baking the
+          # faintness into the border color directly instead keeps the
+          # fill genuinely fully transparent.
+          color = scales::alpha("orange", 0.4)
         ) +
         geom_text(
           data = reference_rects,

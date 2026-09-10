@@ -379,6 +379,28 @@ since they share a calling convention:
   genuinely affect the fill background in this project's ggplot2
   (3.5.1) -- ruled out as an explanation before moving to the
   `fill = "transparent"` approach instead.
+- The Tagger's faint reference-overlay box (`reference_rects`, showing an
+  existing model output for context) was still visibly filled despite
+  `fill = "transparent"`, because that `geom_rect()` call *also* had a
+  fixed `alpha = 0.4` on it. A fixed (non-`aes`) `alpha` parameter on
+  `geom_rect()` is applied to `fill` and `colour` alike via
+  `scales::alpha()`, and `scales::alpha("transparent", 0.4)` evaluates to
+  `"#FFFFFF66"` -- a translucent *white*, not a transparent color:
+  `scales::alpha()` discards whatever alpha a color already carries (here
+  the literal color `"transparent"`, which is just white with alpha 0)
+  and stamps the new alpha onto its RGB instead of multiplying the two.
+  So the box was being washed with translucent white every time, not
+  left clear. Fixed by dropping `alpha` from the call entirely and baking
+  the intended faintness directly into the border instead --
+  `colour = scales::alpha("orange", 0.4)` -- leaving `fill =
+  "transparent"` alone so it's genuinely invisible. The other three
+  `fill = "transparent"` layers in this same plot (`rects2`'s box and
+  label, `rects`'s box) have no `alpha` parameter and were never affected
+  by this. Confirmed with an isolated `ggplot`/`ggsave` reproduction over
+  a colored raster background (a stand-in for the spectrogram): before
+  the fix, the box interior visibly washed out to white; after, the
+  background underneath it is pixel-identical to the surrounding area,
+  with only a faint orange outline.
 - The `"Warning: Un-applied filters selected..."` banner
   (`output$filters_applied`) has a hardcoded yellow background
   (`#filters_applied {background-color: yellow; ...}`); its text color
