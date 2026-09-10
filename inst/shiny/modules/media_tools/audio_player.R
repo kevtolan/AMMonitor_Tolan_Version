@@ -2170,9 +2170,9 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
         ) +
         geom_label(
           data = rects2,
-          aes(x = x_min, y = y_max, label = fk_taxonid, fill = fk_taxonid),
+          aes(x = x_min, y = y_max, label = fk_taxonid),
           colour = "black",
-          alpha = 0.5,
+          fill = "transparent",
           hjust = "left",
           vjust = "top"
         ) +

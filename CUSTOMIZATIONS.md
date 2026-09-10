@@ -321,21 +321,30 @@ since they share a calling convention:
   observer execution order/timing plus DB reads confirming the write,
   live in the browser, before removing the instrumentation.
 - The taxon-name label on each primary model-output/annotation box
-  (`geom_label(data = rects2, aes(..., fill = fk_taxonid), ...)`, used
-  by Tagger/Verifier/Model Verifier alike since `rects2` is just
-  whatever `current_taxon_annotations()` holds for the active mode) had
-  a fully opaque background, obscuring the spectrogram directly behind
-  each label -- most noticeable in Model Verifier, where these are the
-  model outputs being reviewed. Added `alpha = 0.5` to that
-  `geom_label()` call so the label background is translucent instead of
-  solid, while the taxon-color fill and black text stay legible.
-  Confirmed the exact construct renders as a translucent (not opaque)
-  label via an isolated `ggplot`/`ggsave` reproduction; live in-app
-  confirmation wasn't possible this session -- every recording with
-  model outputs in `VCE_AMm_DB_trial` streams its audio from S3, and the
-  spectrogram output never completed rendering for any recording this
-  session (empty `<div class="shiny-plot-output">`, no error in the
-  server log, ~0% CPU), an audio I/O stall unrelated to this change.
+  (`geom_label(data = rects2, ...)`, used by Tagger/Verifier/Model
+  Verifier alike since `rects2` is just whatever
+  `current_taxon_annotations()` holds for the active mode) had a fully
+  opaque background, obscuring the spectrogram directly behind each
+  label -- most noticeable in Model Verifier, where these are the model
+  outputs being reviewed. First tried `alpha = 0.5` with the taxon-color
+  `fill` mapping kept (translucent tint); per follow-up request this was
+  replaced with `fill = "transparent"` (the taxon `fill` aesthetic
+  mapping removed entirely) so the label is fully clear -- just the
+  black outline and text, no tint at all, matching the plain
+  `fill = "transparent"` style already used by this same layer's
+  `geom_rect` box outline right above it. Confirmed via an isolated
+  `ggplot`/`ggsave` reproduction (gridlines pass straight through the
+  label, only the border+text show); live in-app confirmation wasn't
+  possible this session -- every recording with model outputs in either
+  trial database streams its audio from S3 (or the local recordings
+  have no model outputs at all), and the spectrogram output never
+  completed rendering for any recording this session (empty
+  `<div class="shiny-plot-output">`, no server error, ~0% CPU), an
+  audio I/O stall unrelated to this change. Also independently confirmed
+  in this same session that `geom_label()`'s `alpha` parameter *does*
+  genuinely affect the fill background in this project's ggplot2
+  (3.5.1) -- ruled out as an explanation before moving to the
+  `fill = "transparent"` approach instead.
 - The `"Warning: Un-applied filters selected..."` banner
   (`output$filters_applied`) has a hardcoded yellow background
   (`#filters_applied {background-color: yellow; ...}`); its text color
