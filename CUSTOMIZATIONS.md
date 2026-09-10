@@ -320,6 +320,22 @@ since they share a calling convention:
   re-triggers it. Verified via temporary `cat()` instrumentation tracing
   observer execution order/timing plus DB reads confirming the write,
   live in the browser, before removing the instrumentation.
+- The taxon-name label on each primary model-output/annotation box
+  (`geom_label(data = rects2, aes(..., fill = fk_taxonid), ...)`, used
+  by Tagger/Verifier/Model Verifier alike since `rects2` is just
+  whatever `current_taxon_annotations()` holds for the active mode) had
+  a fully opaque background, obscuring the spectrogram directly behind
+  each label -- most noticeable in Model Verifier, where these are the
+  model outputs being reviewed. Added `alpha = 0.5` to that
+  `geom_label()` call so the label background is translucent instead of
+  solid, while the taxon-color fill and black text stay legible.
+  Confirmed the exact construct renders as a translucent (not opaque)
+  label via an isolated `ggplot`/`ggsave` reproduction; live in-app
+  confirmation wasn't possible this session -- every recording with
+  model outputs in `VCE_AMm_DB_trial` streams its audio from S3, and the
+  spectrogram output never completed rendering for any recording this
+  session (empty `<div class="shiny-plot-output">`, no error in the
+  server log, ~0% CPU), an audio I/O stall unrelated to this change.
 - The `"Warning: Un-applied filters selected..."` banner
   (`output$filters_applied`) has a hardcoded yellow background
   (`#filters_applied {background-color: yellow; ...}`); its text color
