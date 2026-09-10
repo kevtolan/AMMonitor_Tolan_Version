@@ -41,7 +41,7 @@
 #' there's no ground truth to score them against.
 #' @family classifier
 #' @importFrom DBI dbGetQuery dbListFields
-#' @importFrom ggplot2 ggplot aes geom_line geom_point scale_x_continuous labs theme_minimal
+#' @importFrom ggplot2 ggplot aes geom_line geom_point scale_color_manual scale_x_continuous labs theme_minimal
 #' @export
 #' @examples
 #' \dontrun{
@@ -192,6 +192,7 @@ testThreshold <- function(con, model_ids, taxon_id, thresholds = NULL, make_plot
     p <- ggplot2::ggplot(sensitivity_long, ggplot2::aes(x = threshold, y = value, color = metric)) +
       ggplot2::geom_line(linewidth = 1) +
       ggplot2::geom_point() +
+      ggplot2::scale_color_manual(values = c(precision = "#F6511D", recall = "#FFB400", f1 = "#00A6ED")) +
       ggplot2::scale_x_continuous(breaks = thresholds) +
       ggplot2::labs(
         title = paste0(taxon_id, " detector: threshold sensitivity"),

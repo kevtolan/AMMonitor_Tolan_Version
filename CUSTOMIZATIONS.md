@@ -142,7 +142,10 @@ since they share a calling convention:
   templates, VCE_AMm_DB_trial's BirdNET-scored American Bittern, and the
   package's own `ammCreateMiniDemo()` fixture) to confirm correct behavior
   across different score scales and with/without the `ManualDetx` column
-  present.
+  present. The precision/recall/F1 lines use a fixed
+  `scale_color_manual()` palette (`precision = "#F6511D"`,
+  `recall = "#FFB400"`, `f1 = "#00A6ED"`) instead of ggplot2's default
+  discrete hues, per request.
 
 ## Bug fixes to existing package functions
 
