@@ -37,10 +37,11 @@ date.}
 \item{visitID}{Specify a specific visit (pk_visitid) from the visits table.
 Default is NULL.}
 
-\item{taxonID}{Specify a specific taxon (pk_taxonid) from the taxa table. 
+\item{taxonID}{Specify one taxon (pk_taxonid) from the taxa table, or a
+character vector of several to match any of them (a species group).
 Default is "all".}
 
-\item{excludeAnnoVerified}{Specify when to exclude based on verification 
+\item{excludeAnnoVerified}{Specify when to exclude based on verification
 status. Default is "NA".}
 
 \item{confValue}{Specify a confidence level to filter modeloutputs 

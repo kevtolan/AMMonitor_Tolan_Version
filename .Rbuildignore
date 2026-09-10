@@ -5,4 +5,3 @@
 ^\.gitlab-ci\.yml$
 ^ci
 ^gitlab_ci\.Rmd$
-^personal_analysis$

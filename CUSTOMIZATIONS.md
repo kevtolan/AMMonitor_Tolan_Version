@@ -110,6 +110,40 @@ since they share a calling convention:
   Scoped narrowly to `UserWarning`s from `multiprocessing.resource_tracker`
   only, so other Python warnings still surface normally.
 
+## New package functions -- classifier threshold sensitivity
+
+- **`R/testThreshold.R`** -- sweeps a range of `modeloutputs` score
+  thresholds for a given `taxon_id`/`model_ids`, and at each one computes a
+  recording-level confusion matrix (TP/FP/TN/FN) plus precision, recall,
+  F1, accuracy, and error rate, so a template/model's score threshold can
+  be picked by seeing exactly where the precision/recall tradeoff lands
+  across candidate cutoffs. Tagged `@family classifier` alongside
+  `plotVerifications()`. Ground truth per recording, in priority order:
+  `media.ManualDetx` (a manual detection-count override some projects add
+  to their `media` table -- not part of the standard schema, so only used
+  if `DBI::dbListFields()` shows the column actually exists in this
+  database) if not NA; otherwise, for a recording with a qualifying
+  modeloutput, whether any of them were accepted in `modelverifications`
+  (unverified or verified valid, not all rejected); otherwise, for a
+  recording with none, a manual `annotations` entry for `taxon_id` (a false
+  negative) or `"no-species"` (a true negative). Recordings matching none
+  of these are excluded from that threshold's confusion matrix.
+  `thresholds` defaults to 17 evenly-spaced values spanning the observed
+  score range for that taxon/model set, since score scales vary widely
+  across model types (e.g. 0-1 BirdNET confidence vs. tens for monitoR
+  binary-template scores) -- no single hardcoded default range would make
+  sense across models. Originally written ad hoc for Wood Frog templates
+  in a personal analysis script (`myfunctions.R`/`testThreshold()`,
+  hardcoded to `taxon = "Wood Frog"`/`model_ids = c(4, 5)`, using dplyr);
+  integrated here as a general package function with `model_ids`/
+  `taxon_id` as required arguments, rewritten in base R (`merge`/`tapply`)
+  since dplyr/tidyr aren't package dependencies (only ggplot2 already is).
+  Verified against three real/demo databases (VPMon_AMM's Wood Frog
+  templates, VCE_AMm_DB_trial's BirdNET-scored American Bittern, and the
+  package's own `ammCreateMiniDemo()` fixture) to confirm correct behavior
+  across different score scales and with/without the `ManualDetx` column
+  present.
+
 ## Bug fixes to existing package functions
 
 - **`inst/shiny/modules/app_modules/registerVisitUpdateDB.R`** -- adding
@@ -243,7 +277,7 @@ since they share a calling convention:
   *other side* already found in this window -- existing model outputs on
   Tagger, existing manual annotations on Model Verifier -- each labelled
   just above the box (`"Wood Frog (13.42)"` on Tagger, the score; `"Wood
-  Frog (ktolan)"` on Model Verifier, who annotated it, since a human
+  Frog (person1)"` on Model Verifier, who annotated it, since a human
   annotation has no numeric confidence to show). Lets whoever's reviewing
   see at a glance that the other side already flagged/confirmed this
   call before adding a new one over the same detection, rather than
