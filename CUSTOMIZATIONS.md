@@ -124,6 +124,36 @@ since they share a calling convention:
   `worker_out` (`sum()` of an empty numeric vector is `0`, not an error,
   and its own `results`-is-NULL check already returns cleanly), so it
   didn't need the equivalent guard.
+- **`scoresDetect()`: one bad recording no longer sacrifices every other
+  recording around it.** The audio download/read step (`utils::download.file()`
+  + `tuneR::readWave()`) was the one part of the per-recording loop *not*
+  already wrapped in a `tryCatch` -- binary- and correlation-template
+  matching each already had their own, per recording, independently. So a
+  single failed download used to be fatal: in the sequential path
+  (`numCores = 1`), it aborted the *entire* call immediately, losing every
+  recording already scored before it too, since `dbInsert` only happens
+  once at the very end on the accumulated results; in the parallel path,
+  it took down that worker's *entire chunk* (~1/`numCores` of the request),
+  not just the one bad file, since an uncaught error partway through
+  `process_chunk()` means it never reaches its own `return`. This is
+  exactly what surfaced live: a user's `numCores = 8` run of 95 recordings
+  lost 2 whole chunks (~24 recordings) to 2 individual S3 download
+  failures. Wrapped the download/read step in its own `tryCatch` in both
+  the sequential loop and `process_chunk()`, matching the existing
+  per-template-type pattern: on failure, `message()` which file and why,
+  record it, and move on to the next recording (`next`) instead of
+  aborting. Failures are collected into a `filename`/`stage`/`message`
+  data.frame -- summarized in one `warning()` when the run finishes, and
+  also attached as the `"failed_recordings"` attribute on the returned
+  scores (`attr(scores, "failed_recordings")`) so exactly which recordings
+  need reprocessing is directly queryable, no more reconstructing
+  `parallel::splitIndices()` by hand to guess which chunk died. Verified
+  with a battery of live tests against a scratch copy of a real database
+  (two fake, guaranteed-to-404 recordings registered in `media` solely for
+  the test) covering both `numCores = 1` and `numCores = 2` with failures
+  interleaved *within* the same chunk as a good recording: in every case,
+  the good recording(s) were still scored and the failure(s) reported by
+  name and reason, with no crash and nothing silently lost.
 - **Multicore support (`numCores` argument)** -- both functions accept
   `numCores`; when > 1, recordings are split into that many chunks and
   processed concurrently via `parallel::mclapply` (fork-based, Unix/macOS

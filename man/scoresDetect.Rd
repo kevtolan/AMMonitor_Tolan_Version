@@ -69,7 +69,10 @@ write a shared \code{current_audio.wav} file as a side effect that would
 otherwise collide across concurrent workers.}
 }
 \value{
-Data.table of scores
+Data.table of scores, with a data.frame of any recordings that
+failed attached as the \code{"failed_recordings"} attribute (columns:
+filename, stage, message; zero rows if none failed) --
+\code{attr(scores, "failed_recordings")}.
 }
 \description{
 \code{scoresDetect} calls monitoR's \code{templateMatching()}
@@ -84,6 +87,13 @@ the path to the AMModels library that stores the RDS template library.
 }
 \details{
 The recording root path argument can be NA.
+
+A recording whose audio can't be downloaded or read is skipped rather
+than aborting the whole call -- every other requested recording (in the
+same chunk, under \code{numCores > 1}) is still processed. Skipped
+recordings are reported in a single \code{warning()} once the run
+finishes, and are also returned as the \code{"failed_recordings"}
+attribute on the result (see Return) for reprocessing just those files.
 }
 \examples{
 \dontrun{

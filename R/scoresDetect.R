@@ -49,7 +49,10 @@
 #' temporary working directory, since monitoR's \code{binMatch}/\code{corMatch}
 #' write a shared \code{current_audio.wav} file as a side effect that would
 #' otherwise collide across concurrent workers.
-#' @return Data.table of scores
+#' @return Data.table of scores, with a data.frame of any recordings that
+#' failed attached as the \code{"failed_recordings"} attribute (columns:
+#' filename, stage, message; zero rows if none failed) --
+#' \code{attr(scores, "failed_recordings")}.
 #' @importFrom DBI dbGetQuery dbSendQuery dbFetch dbBind dbClearResult
 #' @importFrom AMModels getAMModel
 #' @import monitoR
@@ -59,6 +62,13 @@
 #' @importFrom parallel mclapply splitIndices
 #' @details
 #' The recording root path argument can be NA.
+#'
+#' A recording whose audio can't be downloaded or read is skipped rather
+#' than aborting the whole call -- every other requested recording (in the
+#' same chunk, under \code{numCores > 1}) is still processed. Skipped
+#' recordings are reported in a single \code{warning()} once the run
+#' finishes, and are also returned as the \code{"failed_recordings"}
+#' attribute on the result (see Return) for reprocessing just those files.
 #'
 #' @export
 #' @examples
@@ -289,6 +299,7 @@ scoresDetect <- function(
 
   total_duration_sec <- 0
   start_time <- Sys.time()
+  failures <- data.frame(filename = character(0), stage = character(0), message = character(0))
 
   if (use_parallel) {
     scores <- scoresDetectParallelChunks(
@@ -305,6 +316,7 @@ scoresDetect <- function(
       numCores = min(numCores, nrow(survey_info))
     )
     total_duration_sec <- attr(scores, "total_duration_sec")
+    failures <- attr(scores, "failures")
 
   } else {
 
@@ -315,22 +327,44 @@ scoresDetect <- function(
   # Run templates for each recording
   for (i in seq_len(nrow(survey_info))) {
     audio_path <- file.path(recordingRootPath, survey_info[i, 'filename'])
-    current_audio <- methods::as(
-      if (grepl("^www.|^http:|^https:", audio_path)) {
-        temp.file <- tempfile()
-        utils::download.file(
-          url = audio_path,
-          destfile = temp.file,
-          quiet = TRUE,
-          mode = "wb",
-          cacheOK = TRUE
-        )
-        if (!file.exists(temp.file)) stop("File couldn't be downloaded")
-        tuneR::readWave(temp.file)
-      } else {
-        tuneR::readWave(audio_path)
-      },
-      "Wave")
+    current_audio <- tryCatch(
+      methods::as(
+        if (grepl("^www.|^http:|^https:", audio_path)) {
+          temp.file <- tempfile()
+          utils::download.file(
+            url = audio_path,
+            destfile = temp.file,
+            quiet = TRUE,
+            mode = "wb",
+            cacheOK = TRUE
+          )
+          if (!file.exists(temp.file)) stop("File couldn't be downloaded")
+          tuneR::readWave(temp.file)
+        } else {
+          tuneR::readWave(audio_path)
+        },
+        "Wave"),
+      error = function(e) e
+    )
+
+    # A failed download/read used to be fatal to the whole call -- every
+    # recording already processed before it (and never inserted, since
+    # dbInsert only happens once at the very end) would be silently lost
+    # along with it. Skipping just this one recording instead means one
+    # bad file no longer sacrifices everything else in the run.
+    if (inherits(current_audio, "error")) {
+      message(paste0(
+        "There was an issue with file ",
+        survey_info[i, 'filename'],
+        " while reading/downloading the audio, skipping this recording: ",
+        conditionMessage(current_audio)
+      ))
+      failures <- rbind(failures, data.frame(
+        filename = survey_info[i, 'filename'], stage = "download", message = conditionMessage(current_audio)
+      ))
+      if (showProgress == TRUE) setTxtProgressBar(pb, 2 * i)
+      next
+    }
 
     total_duration_sec <- total_duration_sec + length(current_audio@left) / current_audio@samp.rate
 
@@ -512,8 +546,17 @@ scoresDetect <- function(
 
   elapsed_sec <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
   if (showProgress == TRUE) {
-    reportDetectionSpeed(nrow(survey_info), elapsed_sec, total_duration_sec)
+    reportDetectionSpeed(nrow(survey_info) - nrow(failures), elapsed_sec, total_duration_sec)
   }
+
+  if (nrow(failures) > 0) {
+    warning(
+      nrow(failures), " of ", nrow(survey_info), " recording(s) had an error and were skipped: ",
+      paste0(failures$filename, " (", failures$stage, ": ", failures$message, ")", collapse = "; "),
+      call. = FALSE
+    )
+  }
+  attr(scores, "failed_recordings") <- failures
 
   on.exit(unlink('current_audio.wav'))
 
@@ -760,6 +803,7 @@ scoresDetectParallelChunks <- function(survey_info, recordingRootPath, binTempla
       value_num = numeric(0)
     )
     chunk_duration <- 0
+    chunk_failures <- data.frame(filename = character(0), stage = character(0), message = character(0))
 
     for (i in seq_len(nrow(chunk_survey_info))) {
       if (showProgress) {
@@ -783,22 +827,44 @@ scoresDetectParallelChunks <- function(survey_info, recordingRootPath, binTempla
       }
 
       audio_path <- file.path(recordingRootPath, chunk_survey_info[i, 'filename'])
-      current_audio <- methods::as(
-        if (grepl("^www.|^http:|^https:", audio_path)) {
-          temp.file <- tempfile()
-          utils::download.file(
-            url = audio_path,
-            destfile = temp.file,
-            quiet = TRUE,
-            mode = "wb",
-            cacheOK = TRUE
-          )
-          if (!file.exists(temp.file)) stop("File couldn't be downloaded")
-          tuneR::readWave(temp.file)
-        } else {
-          tuneR::readWave(audio_path)
-        },
-        "Wave")
+      current_audio <- tryCatch(
+        methods::as(
+          if (grepl("^www.|^http:|^https:", audio_path)) {
+            temp.file <- tempfile()
+            utils::download.file(
+              url = audio_path,
+              destfile = temp.file,
+              quiet = TRUE,
+              mode = "wb",
+              cacheOK = TRUE
+            )
+            if (!file.exists(temp.file)) stop("File couldn't be downloaded")
+            tuneR::readWave(temp.file)
+          } else {
+            tuneR::readWave(audio_path)
+          },
+          "Wave"),
+        error = function(e) e
+      )
+
+      # A failed download/read used to be fatal to this whole worker's
+      # entire chunk (an uncaught error here propagates straight out of
+      # process_chunk, and mclapply then discards everything that chunk
+      # had already scored, not just this one recording). Skipping just
+      # this recording instead means one bad file no longer sacrifices
+      # the rest of the chunk.
+      if (inherits(current_audio, "error")) {
+        message(paste0(
+          "There was an issue with file ",
+          chunk_survey_info[i, 'filename'],
+          " while reading/downloading the audio, skipping this recording: ",
+          conditionMessage(current_audio)
+        ))
+        chunk_failures <- rbind(chunk_failures, data.frame(
+          filename = chunk_survey_info[i, 'filename'], stage = "download", message = conditionMessage(current_audio)
+        ))
+        next
+      }
 
       chunk_duration <- chunk_duration + length(current_audio@left) / current_audio@samp.rate
 
@@ -936,7 +1002,7 @@ scoresDetectParallelChunks <- function(survey_info, recordingRootPath, binTempla
       }
     }
 
-    list(scores = chunk_scores, duration = chunk_duration)
+    list(scores = chunk_scores, duration = chunk_duration, failures = chunk_failures)
   }
 
   chunks <- lapply(parallel::splitIndices(nrow(survey_info), numCores), function(idx) survey_info[idx, , drop = FALSE])
@@ -963,5 +1029,6 @@ scoresDetectParallelChunks <- function(survey_info, recordingRootPath, binTempla
 
   scores <- do.call(rbind, lapply(worker_out, `[[`, "scores"))
   attr(scores, "total_duration_sec") <- sum(vapply(worker_out, `[[`, numeric(1), "duration"))
+  attr(scores, "failures") <- do.call(rbind, lapply(worker_out, `[[`, "failures"))
   scores
 }
