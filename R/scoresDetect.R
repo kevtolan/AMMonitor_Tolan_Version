@@ -728,6 +728,18 @@ scoresDetectParallelChunks <- function(survey_info, recordingRootPath, binTempla
                                        template_info, combos, dup_runs, dbInsert, corMethod,
                                        showProgress, numCores) {
 
+  # A shared ticker file every worker appends one line to as it finishes
+  # each recording, giving a genuinely increasing "M of N done" count. A
+  # single small append (one line, well under PIPE_BUF) is an atomic write
+  # on POSIX, so concurrent workers can't corrupt each other's entries
+  # without explicit locking. See the identical pattern (and the "why" of
+  # the /dev/stderr write below) in birdsDetect().
+  ticker_file <- if (showProgress) tempfile() else NULL
+  if (showProgress) {
+    file.create(ticker_file)
+    on.exit(unlink(ticker_file), add = TRUE)
+  }
+
   process_chunk <- function(chunk_survey_info) {
     # Isolate this worker's monitoR side-effect file ("current_audio.wav",
     # written to the working directory by binMatch()/corMatch()) from every
@@ -750,7 +762,25 @@ scoresDetectParallelChunks <- function(survey_info, recordingRootPath, binTempla
     chunk_duration <- 0
 
     for (i in seq_len(nrow(chunk_survey_info))) {
-      if (showProgress) cat(chunk_survey_info[i, 'filename'], "\n")
+      if (showProgress) {
+        # Neither cat() nor message() to R's usual stdout()/stderr() show
+        # up here under numCores > 1: both go through R's own connection
+        # objects, which in RStudio are wired to a console-output callback
+        # that only the main (non-forked) session is hooked up to -- a
+        # forked mclapply() worker calling either just gets silently
+        # dropped, even on stderr. Opening "/dev/stderr" *by its literal
+        # path* (Unix only, but mclapply forking already is) bypasses R's
+        # connection/callback layer entirely with a raw write() to fd 2,
+        # which shows up in RStudio the same way e.g. a Python tqdm bar
+        # piped through reticulate would.
+        cat("x\n", file = ticker_file, append = TRUE)
+        completed <- length(readLines(ticker_file, warn = FALSE))
+        if (.Platform$OS.type == "unix") {
+          cat(completed, "/", nrow(survey_info), " ", chunk_survey_info[i, 'filename'], "\n", sep = "", file = "/dev/stderr")
+        } else {
+          message(completed, "/", nrow(survey_info), " ", chunk_survey_info[i, 'filename'])
+        }
+      }
 
       audio_path <- file.path(recordingRootPath, chunk_survey_info[i, 'filename'])
       current_audio <- methods::as(
@@ -914,10 +944,21 @@ scoresDetectParallelChunks <- function(survey_info, recordingRootPath, binTempla
 
   failed <- vapply(worker_out, inherits, logical(1), "try-error")
   if (any(failed)) {
+    # A try-error from mclapply is itself a character string (the printed
+    # "Error in ... : message"), not a condition object -- conditionMessage()
+    # only works on the actual condition, stashed as its "condition"
+    # attribute. Calling conditionMessage() on the try-error directly errors
+    # ("no applicable method"), which would otherwise mask whatever the
+    # real per-worker failure was.
+    worker_messages <- vapply(worker_out[failed], function(x) conditionMessage(attr(x, "condition")), character(1))
     warning(sum(failed), " of ", length(worker_out), " parallel worker(s) failed and were skipped: ",
-            paste(vapply(worker_out[failed], conditionMessage, character(1)), collapse = "; "),
+            paste(worker_messages, collapse = "; "),
             call. = FALSE)
     worker_out <- worker_out[!failed]
+  }
+
+  if (length(worker_out) == 0) {
+    stop("All parallel workers failed; no recordings were processed. See the warning above for the underlying error(s).", call. = FALSE)
   }
 
   scores <- do.call(rbind, lapply(worker_out, `[[`, "scores"))

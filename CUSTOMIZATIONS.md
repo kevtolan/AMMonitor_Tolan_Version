@@ -86,6 +86,44 @@ since they share a calling convention:
   connection involved; opening `/dev/stderr` by path does the same raw
   write from R's side. Falls back to `message()` on non-Unix (where
   forking doesn't happen anyway).
+- **`scoresDetect()`'s parallel path never actually got the progress-output
+  fix above** -- `scoresDetectParallelChunks()`'s per-recording loop had
+  its own plain `cat(filename, "\n")`, which -- being the same
+  forked-`mclapply`-worker output that motivated the `/dev/stderr` trick
+  for `birdsDetect()` in the first place -- silently produced no visible
+  output at all under `numCores > 1` (confirmed live: only the final
+  `reportDetectionSpeed()` summary showed up, nothing during the run).
+  Replaced with the identical shared-ticker-file + `/dev/stderr` pattern
+  used by `birdsDetect()`, so `numCores > 1` now behaves the same as that
+  function. `numCores = 1` was never affected -- it already uses
+  `utils::txtProgressBar()`, which runs in the main process and was never
+  silenced.
+- **Fixed a crash in both functions' parallel-worker-failure warning**
+  (`... parallel worker(s) failed and were skipped: ...`), found while
+  live-testing the fix above against a deliberately-broken S3 URL: a
+  `try-error` returned by `mclapply()` on a failed worker is itself a
+  character string (the printed `"Error in ... : message"`), not a
+  condition object, so `conditionMessage(worker_out[failed])` -- called
+  directly on it -- errored with `"no applicable method for
+  'conditionMessage'"`, masking whatever the real per-worker failure was.
+  Fixed by pulling the actual condition out of its `"condition"`
+  attribute first: `conditionMessage(attr(x, "condition"))`. Verified live
+  against both the real, transient failure that surfaced it (an S3
+  download timeout) and a deliberately-unreachable URL, confirming the
+  real underlying error now displays correctly in both functions instead
+  of crashing.
+- **`scoresDetect()`: fixed a second crash when *every* parallel worker
+  fails** -- after the fix above filters all-failed workers out of
+  `worker_out`, an empty `worker_out` made `do.call(rbind, ...)` return
+  `NULL`, and the next line's `attr(scores, "total_duration_sec") <-`
+  then failed with `"attempt to set an attribute on NULL"` -- instead of
+  the warning above (which does still fire) actually explaining what went
+  wrong. Added an explicit check that raises a clear
+  `stop("All parallel workers failed; ...")` in that case.
+  `birdsDetect()`'s analogous downstream code already tolerated an empty
+  `worker_out` (`sum()` of an empty numeric vector is `0`, not an error,
+  and its own `results`-is-NULL check already returns cleanly), so it
+  didn't need the equivalent guard.
 - **Multicore support (`numCores` argument)** -- both functions accept
   `numCores`; when > 1, recordings are split into that many chunks and
   processed concurrently via `parallel::mclapply` (fork-based, Unix/macOS

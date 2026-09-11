@@ -313,8 +313,15 @@ birdsDetect <- function(
 
     failed <- vapply(worker_out, inherits, logical(1), "try-error")
     if (any(failed)) {
+      # A try-error from mclapply is itself a character string (the printed
+      # "Error in ... : message"), not a condition object -- conditionMessage()
+      # only works on the actual condition, stashed as its "condition"
+      # attribute. Calling conditionMessage() on the try-error directly errors
+      # ("no applicable method"), which would otherwise mask whatever the
+      # real per-worker failure was.
+      worker_messages <- vapply(worker_out[failed], function(x) conditionMessage(attr(x, "condition")), character(1))
       warning(sum(failed), " of ", length(worker_out), " parallel worker(s) failed and were skipped: ",
-              paste(vapply(worker_out[failed], conditionMessage, character(1)), collapse = "; "),
+              paste(worker_messages, collapse = "; "),
               call. = FALSE)
       worker_out <- worker_out[!failed]
     }
