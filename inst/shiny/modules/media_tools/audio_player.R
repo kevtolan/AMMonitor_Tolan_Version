@@ -1528,6 +1528,15 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
 
     # Update tags (and clear old ones) when switching to a new audio file
     # Remove new boxes when recording changes
+    # Priority 50: must refresh current_taxon_annotations() for the new file
+    # before the "jump to selection" observer below (default priority) reacts
+    # to the same file-change event. That observer also fires on
+    # audio_avail()$pk_mediaid[i_audio()], and selected_rows() still holds the
+    # previous file's selection at that point (its client-side clear via
+    # updateReactable() doesn't land in the same flush) -- if it ran first,
+    # it would match those stale IDs against the still-stale
+    # current_taxon_annotations() and jump startTime() away from the 0 that
+    # the priority-100 reset observer above just set.
     observe({
       req(nrow(audio_avail()) > 0)
       updateTags()
@@ -1626,7 +1635,7 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
         current_taxon_annotations(cbind(current_taxon_annotations(), selected_row = FALSE))
       }
 
-    }) |> bindEvent(audio_avail()$pk_mediaid[i_audio()], deleted_rows(), updateTags(), update_boxes(), input$viewModelOutputs)
+    }, priority = 50) |> bindEvent(audio_avail()$pk_mediaid[i_audio()], deleted_rows(), updateTags(), update_boxes(), input$viewModelOutputs)
 
     #audio player-----------------
     output$player <- renderUI({

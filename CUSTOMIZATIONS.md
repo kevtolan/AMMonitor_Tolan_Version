@@ -843,6 +843,25 @@ since they share a calling convention:
   `is.null(input$apply_filters) || input$apply_filters == 0`, so they
   produce the same empty placeholder on that first `NULL` too instead of
   staying unfired.
+- Fixed the spectrogram view not resetting to 0 seconds in Model
+  Verifications (and any other viewer mode) when moving to the next/previous
+  file. A priority-100 observer already resets `startTime(0)` on every file
+  change, but a second, default-priority "jump to selection" observer
+  (triggered by `selected_rows()` *and* the same file-change event) could
+  still overwrite it in the same flush: `selected_rows()` still held the
+  previous file's selected row(s) at that point (its client-side clear via
+  `updateReactable()` doesn't land until a later round trip), and if this
+  observer ran before the also-default-priority observer that refreshes
+  `current_taxon_annotations()` for the new file, it matched those stale
+  selected IDs against the still-stale annotations and jumped `startTime()`
+  to that old row's coordinates -- undoing the reset. Most visible in Model
+  Verifications because its detection table allows multi-select, so users
+  routinely have a row selected before paging. Fixed by giving the
+  `current_taxon_annotations()`-refresh observer `priority = 50` (between
+  the reset's 100 and the jump-to-selection observer's default 0), so the
+  annotations are always refreshed for the new file before the
+  jump-to-selection observer can act on them -- the stale IDs then match
+  nothing, so no unwanted jump occurs.
 
 ### `modules/my_home.R`
 
