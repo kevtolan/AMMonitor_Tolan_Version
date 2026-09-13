@@ -2028,18 +2028,29 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
           the_bboxes()$x_max <= (startTime() + input$specLength)
       ), ]
 
+      # Note: unlike x_min/x_max, y_min/y_max are NOT part of this filter --
+      # a manual annotation's own frequency bounds are independent of the
+      # "Audio Frequency Range" display filter, so a box that (partially or
+      # fully) exceeds the currently displayed frequency window is clamped
+      # to it below rather than dropped from the plot entirely. Excluding on
+      # y_min/y_max here used to make a box vanish outright whenever its
+      # saved bounds ran past the current frequency filter (or past the
+      # recording's own Nyquist limit) -- e.g. a real annotation with
+      # y_max = 9.82 kHz was invisible whenever the display range topped
+      # out at 8 kHz, even though the annotation was otherwise fully in
+      # view.
       rects2 <- current_taxon_annotations()[which(
         current_taxon_annotations()$fk_mediaid == audio_avail()$pk_mediaid[i_audio()] &
           current_taxon_annotations()$x_min >= startTime() &
           current_taxon_annotations()$x_max <= (startTime() + input$specLength) &
-          (current_taxon_annotations()$y_min >= spec_range[1]) %in% c(1, NA) &
-          (current_taxon_annotations()$y_max <= spec_range[2]) %in% c(1, NA) &
           current_taxon_annotations()$is_delete == 0
       ), c("x_min", "y_min", "x_max", "y_max")]
 
-      # Set frequency (y-) bounds for boxes to max when unspecified
-      rects2$y_min <- ifelse(is.na(rects2$y_min), spec_range[1], rects2$y_min)
-      rects2$y_max <- ifelse(is.na(rects2$y_max), spec_range[2], rects2$y_max)
+      # Set frequency (y-) bounds for boxes to max when unspecified, and
+      # clamp any bounds that run past the currently displayed frequency
+      # range so the box still renders (clipped) instead of disappearing.
+      rects2$y_min <- pmax(ifelse(is.na(rects2$y_min), spec_range[1], rects2$y_min), spec_range[1])
+      rects2$y_max <- pmin(ifelse(is.na(rects2$y_max), spec_range[2], rects2$y_max), spec_range[2])
 
       if (nrow(rects)) {
         rects <- rects - t(matrix(rep(c(startTime(),0,startTime(),0), nrow(rects)), nrow = 4))
@@ -2054,8 +2065,6 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
         current_taxon_annotations()$fk_mediaid == audio_avail()$pk_mediaid[i_audio()] &
           current_taxon_annotations()$x_min >= startTime() &
           current_taxon_annotations()$x_max <= (startTime() + input$specLength) &
-          (current_taxon_annotations()$y_min >= spec_range[1]) %in% c(1, NA) &
-          (current_taxon_annotations()$y_max <= spec_range[2]) %in% c(1, NA) &
           current_taxon_annotations()$is_delete == 0
       ), c("fk_taxonid", "selected_row")])
 

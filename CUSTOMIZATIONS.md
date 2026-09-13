@@ -862,6 +862,31 @@ since they share a calling convention:
   annotations are always refreshed for the new file before the
   jump-to-selection observer can act on them -- the stale IDs then match
   nothing, so no unwanted jump occurs.
+- Fixed manual annotation boxes silently failing to render on the
+  spectrogram in Audio Tagger (and, by the same code path, Player/Verifier)
+  whenever an annotation's saved `y_min`/`y_max` ran past the currently
+  displayed "Audio Frequency Range" filter (or past the recording's own
+  Nyquist limit) -- e.g. a real annotation with `y_max = 9.82` kHz was
+  completely invisible whenever the display range topped out at 8 kHz,
+  even though it was otherwise fully inside the visible time window.
+  `output$plotx`'s `rects2` (each mode's own primary/editable boxes, built
+  from `current_taxon_annotations()`) filtered candidate rows with `(y_min
+  >= spec_range[1]) %in% c(1, NA)` and `(y_max <= spec_range[2]) %in% c(1,
+  NA)` alongside the x_min/x_max time-window check -- unlike the time
+  check (deliberately hiding boxes outside the currently scrolled time
+  window), excluding on the *frequency* filter this way made a box vanish
+  outright instead of just clipping to the visible band, which is wrong
+  for a display/zoom setting that has nothing to do with whether the
+  annotation itself should be shown. Fixed by dropping the y_min/y_max
+  conditions from both `which()` filters in `output$plotx` (the box-data
+  and the box-label cbind use identical filters and had to be kept in
+  sync) and clamping the resulting `y_min`/`y_max` to `spec_range` with
+  `pmax()`/`pmin()` (alongside the existing NA-defaulting) instead, so a
+  box is now clipped to the visible frequency band rather than dropped.
+  Verified live: an `ammCreateMiniDemo()` recording with two manual
+  annotations (one within range, one with `y_max` above the demo
+  recording's ~8 kHz Nyquist limit) showed only the first box before the
+  fix and both boxes (the second clipped at the top) after.
 
 ### `modules/my_home.R`
 
