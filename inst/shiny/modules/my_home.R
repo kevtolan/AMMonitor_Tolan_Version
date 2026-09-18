@@ -36,13 +36,37 @@ my_home_server <- function(id) {
     id,
     function(input, output, session) {
       
-      con <<- reactiveVal(NA)
-      # onStop() is an app-level hook, not a per-session one: it fires once
-      # when the whole Shiny app process stops, regardless of how many
-      # sessions ever connected. my_home_server() runs once per session
-      # (once per browser reconnect/reload, since this is a single-user
-      # local app with one shared global `con`), so without this guard,
-      # every reconnect registers ANOTHER onStop() callback, and they all
+      # `con` is a single connection shared globally across every session
+      # (this is a single-user local app), so it must only be initialized
+      # once for the life of the app process -- NOT guarding this the same
+      # way onStop() is guarded just below meant every browser
+      # reconnect/reload/second tab re-ran `con <<- reactiveVal(NA)`,
+      # silently resetting the live connection out from under any OTHER
+      # already-connected session. A background autosave in that other
+      # session then called con() expecting a DBI connection and got the
+      # fresh reactiveVal's default NA instead, crashing dbSendQuery with
+      # "unable to find an inherited method ... conn = 'logical'".
+      if (!exists("con", envir = .GlobalEnv, inherits = FALSE)) {
+        con <<- reactiveVal(NA)
+      }
+      # Intended as an app-level hook that fires once when the whole Shiny
+      # app process stops, regardless of how many sessions ever connected
+      # -- NOT a per-session one, since `con` is a single connection shared
+      # globally across every session (this is a single-user local app).
+      # `session = NULL` is required for that: per ?shiny::onStop, calling
+      # onStop() from within a server function (as this is, inside
+      # moduleServer()) defaults `session` to the CURRENT session, which
+      # makes the callback fire when that one session/tab ends -- not when
+      # the app itself stops. Without `session = NULL` here, whichever
+      # session happened to win the guard below and register this callback
+      # would, the moment that particular tab was later closed or
+      # reloaded, disconnect and rm() the shared global `con` out from
+      # under every OTHER still-active session, even ones opened afterward
+      # -- the same "conn = 'logical'" crash as the missing guard above,
+      # just triggered by a session ending instead of one starting.
+      # Separately, my_home_server() runs once per session (once per
+      # browser reconnect/reload), so without the guard itself, every
+      # reconnect would register ANOTHER onStop() callback, and they'd all
       # fire when the app finally stops -- printing "Closing Database
       # Connections" once per reconnect instead of once per app run.
       if (!isTRUE(getOption("ammonitor.onstop_registered"))) {
@@ -60,9 +84,9 @@ my_home_server <- function(id) {
             }
             rm(con, envir = .GlobalEnv)
           })
-        })
+        }, session = NULL)
       }
-      
+
       user_first_name <- reactiveVal(character())
       
       observeEvent(input$connect2db, {

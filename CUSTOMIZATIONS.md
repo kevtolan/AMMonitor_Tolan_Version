@@ -903,6 +903,43 @@ since they share a calling convention:
   tweak something, relaunch, without restarting R) registers its own
   handler again instead of finding the flag still set from the previous
   run.
+- Fixed a live crash during Model Verifications: `Error in : unable to
+  find an inherited method for function 'dbSendQuery' for signature
+  'conn = "logical"'`, raised from `save_metadata_cache.R`'s autosave
+  path. Root cause was two related bugs in how the single database
+  connection (`con`, a global `reactiveVal` shared across every session,
+  by design -- this is a single-user local app) gets initialized and torn
+  down, both triggered by nothing more than opening a second browser tab
+  (or reloading one) while another tab was mid-session:
+  1. `con <<- reactiveVal(NA)` ran unconditionally at the top of every
+     `my_home_server()` call -- i.e. on every new session, including one
+     that never even logs in. Since `con` is a single shared global, a
+     brand-new session silently replaced any OTHER session's already-live
+     connection with a fresh, disconnected `NA` the instant it started.
+     An in-progress session's autosave then called `con()` expecting a
+     `DBI` connection and got that stale `NA` instead. Fixed by only
+     initializing `con` if it doesn't already exist in the global
+     environment (`if (!exists("con", envir = .GlobalEnv, inherits =
+     FALSE))`), matching the guard already used for the `onStop()`
+     registration just below it.
+  2. The previous fix/bullet above assumed `onStop()` registered inside
+     `my_home_server()` was already app-level; per `?shiny::onStop`,
+     calling it from within a server function actually defaults `session`
+     to the *current* session, making the callback fire when that one
+     session/tab ends -- not when the app itself stops. So whichever
+     session happened to win the registration guard would, the moment
+     that particular tab was later closed or reloaded, run
+     `dbDisconnect()` + `rm(con, ...)` and reset the registration flag --
+     yanking the shared connection out from under every other still-active
+     session (and silently re-creating it as a fresh disconnected `NA` for
+     the next session to start, via fix 1 above). Fixed by passing
+     `session = NULL` to `onStop()`, which per the docs makes the callback
+     truly app-level (fires only when `runApp()` itself exits).
+  Verified live: with the fix, connecting in one browser tab, then
+  opening/reloading/closing a second tab against the same running app
+  repeatedly, no longer disturbs the first tab's connection or ability to
+  query the database; before the fix, the same sequence reliably reset
+  the shared `con` to `NA`.
 
 ## Related database schema changes (not in this repo)
 
