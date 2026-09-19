@@ -200,7 +200,7 @@ testThresholdRec <- function(con, model_ids, taxon_id, thresholds = NULL, make_p
       ggplot2::labs(
         title = paste0(taxon_id, " detector: threshold sensitivity"),
         subtitle = "recording-level precision / recall / F1",
-        x = "score threshold", y = NULL, color = NULL
+        x = "score threshold", y = "metric value", color = NULL
       ) +
       ggplot2::theme_minimal()
   }

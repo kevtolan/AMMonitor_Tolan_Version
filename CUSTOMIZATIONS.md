@@ -243,6 +243,11 @@ since they share a calling convention:
   this can) and the package's own `ammCreateMiniDemo()` fixture (including
   the zero-detections-at-a-threshold edge case, which correctly returns
   `NaN` precision/recall rather than erroring).
+- Both `testThresholdRec()` and `testThresholdDetx()` plots now label the
+  y axis `"metric value"` instead of leaving it blank (`y = NULL`) -- the
+  color legend already names precision/recall/F1, but without an axis
+  title the plots didn't say what those lines' vertical position actually
+  represented.
 
 ## Bug fixes to existing package functions
 
