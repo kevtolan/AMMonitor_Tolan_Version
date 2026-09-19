@@ -782,6 +782,13 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
           lessThan = input$modelLessThan,
           newOnly = FALSE,
           mediaType = "audio",
+          # Filtered here in SQL, before `limit` truncates the result set,
+          # rather than left to the shared post-filter below -- this mode
+          # is the only one of the four with a `limit`, so it's the only
+          # one where filtering afterward could silently miss "saved"
+          # media that just didn't happen to fall within the first 2500
+          # rows (ordered by date).
+          manualDetxFilter = input$manualDetxFilter,
           limit = 2500 # can change if need be
         ),
         verifier = AMMonitor::qryMedia(
@@ -830,7 +837,10 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
         )
       )
 
-      if (nrow(audios) > 0 && input$manualDetxFilter != 'all') {
+      # Skip for modelOutputs: that call above already filters on
+      # manualDetxFilter in SQL (see comment there for why this shared
+      # post-filter isn't safe to rely on for that mode specifically).
+      if (viewer_mode != "modelOutputs" && nrow(audios) > 0 && input$manualDetxFilter != 'all') {
         manualdetx_status <- dbGetQuery(
           con(),
           paste0(

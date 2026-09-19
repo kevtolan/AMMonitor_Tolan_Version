@@ -257,6 +257,36 @@ since they share a calling convention:
   only ever assigned in the *other* branch (creating a brand-new visit).
   Selecting an existing visit hit an undefined-variable error before any
   media could be added. Removed the stray reference.
+- **`R/qry.R`'s `qryModelOutputsMedia()`, `inst/shiny/modules/media_tools/audio_player.R`**
+  -- the "Manual Detections" filter's "Already saved" option (restricting
+  to media where the `media.ManualDetx` customization column is set)
+  could silently return too few or zero results in Model Verifications
+  specifically. `qryModelOutputsMedia()` applies a hard `LIMIT` (2500 in
+  this app's call) in SQL, ordered by `start_date, start_time` -- but the
+  ManualDetx filter was applied *afterward*, as a separate query run by
+  `audio_player.R` on whatever rows the first query already returned. If
+  a species/model/confidence filter matched more than `LIMIT` candidate
+  recordings, only the chronologically-first batch was ever fetched, so a
+  "saved" recording sitting outside that batch was excluded before the
+  ManualDetx filter even got a chance to see it -- looking exactly like
+  "Already saved isn't working" with no error. (The other three viewer
+  modes -- Player/Tagger/Verifier -- use `qryMedia()`, which this app
+  calls with no `limit` at all, so they were never affected.) Fixed by
+  adding a `manualDetxFilter` parameter to `qryModelOutputsMedia()` that
+  builds `media.ManualDetx IS NOT NULL` / `IS NULL` directly into the SQL
+  WHERE clause (guarded by `"ManualDetx" %in% DBI::dbListFields(con,
+  "media")`, since the column isn't part of the standard schema), so
+  filtering happens before `LIMIT` truncates anything, not after.
+  `audio_player.R`'s modelOutputs call now passes this through, and its
+  shared post-filter (still used by the other three modes, which don't
+  need this fix) now skips modelOutputs to avoid redundant filtering.
+  Verified directly against a real SQLite connection: with two
+  recordings, the later-dated one `ManualDetx`-saved and the earlier one
+  not, `qryModelOutputsMedia(..., manualDetxFilter = "saved", limit = 1)`
+  correctly returns the saved recording despite `limit = 1`, while
+  reproducing the old fetch-then-filter approach on the same data (fetch
+  with `limit = 1`, filter for saved afterward) returns zero rows --
+  exactly the bug.
 - **`R/scoresDetect.R`** -- `scoreThresholds` was matched by name against
   template names; an unnamed vector (`names(scoreThresholds)` is `NULL`)
   matched nothing and was silently ignored -- no error, no warning, the

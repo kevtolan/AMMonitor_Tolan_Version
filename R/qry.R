@@ -675,29 +675,41 @@ qryMedia <- function(con, disconnect = FALSE, locationID = 'all', dateRange = li
 #' (pk_personid from the people table). Default is NA.
 #' @param model Which model to display (pk_modelid from the models table). 
 #' Default is "all".
-#' @param mediaType Type of media. Options are "photo" (default) or "audio". 
+#' @param mediaType Type of media. Options are "photo" (default) or "audio".
 #' @param newOnly TRUE or FALSE. Default is FALSE.
+#' @param manualDetxFilter Filter on the \code{media.ManualDetx} column (a
+#' project-specific customization -- a manual detection-count override some
+#' AMMonitor projects add to the media table -- not part of the standard
+#' schema). "all" (default) applies no filter; "saved" restricts to media
+#' where \code{ManualDetx} has been set (is not NULL); "unsaved" restricts
+#' to media where it hasn't (is NULL). Applied in SQL, before \code{limit},
+#' so it isn't silently defeated by \code{limit} truncating the result set
+#' first -- unlike filtering it in afterward on the caller's side, which
+#' can only ever see whatever \code{limit} rows already made it through. If
+#' this database doesn't have the \code{ManualDetx} column at all, this
+#' filter is ignored (there's nothing to filter on).
 #' @param limit Maximum number of records to be returned
 #' @param offset The number of records to offset the query by
 #' @usage qryModelOutputsMedia(
-#'   con, 
-#'   disconnect = FALSE, 
-#'   locationID = 'all', 
-#'   dateRange = list(c('1900-01-01', as.character(Sys.Date()))), 
-#'   visitID = NULL, 
-#'   taxonID = 'all', 
+#'   con,
+#'   disconnect = FALSE,
+#'   locationID = 'all',
+#'   dateRange = list(c('1900-01-01', as.character(Sys.Date()))),
+#'   visitID = NULL,
+#'   taxonID = 'all',
 #'   excludeAnnoVerified = 'NA',
-#'   selectedUser = NA, 
-#'   model = "all", 
-#'   confValue = 0, 
-#'   lessThan = FALSE, 
-#'   newOnly = FALSE, 
+#'   selectedUser = NA,
+#'   model = "all",
+#'   confValue = 0,
+#'   lessThan = FALSE,
+#'   newOnly = FALSE,
 #'   mediaType = "photo",
+#'   manualDetxFilter = "all",
 #'   limit = Inf,
 #'   offset = 0
 #' )
-#' @importFrom DBI dbIsValid dbDisconnect dbSendQuery dbBind dbFetch 
-#' dbClearResult
+#' @importFrom DBI dbIsValid dbDisconnect dbSendQuery dbBind dbFetch
+#' dbClearResult dbListFields
 #' @family query
 #' @concept media
 #' @concept models
@@ -735,7 +747,7 @@ qryMedia <- function(con, disconnect = FALSE, locationID = 'all', dateRange = li
 #' }
 NULL
 
-qryModelOutputsMedia <- function(con, disconnect = FALSE, locationID = 'all', dateRange = list(c('1900-01-01', as.character(Sys.Date()))), visitID = NULL, taxonID = 'all', excludeAnnoVerified = 'NA', selectedUser = NA, model = 'all', confValue = 0, lessThan = FALSE, newOnly = FALSE, mediaType = "photo", limit = Inf, offset = 0) {
+qryModelOutputsMedia <- function(con, disconnect = FALSE, locationID = 'all', dateRange = list(c('1900-01-01', as.character(Sys.Date()))), visitID = NULL, taxonID = 'all', excludeAnnoVerified = 'NA', selectedUser = NA, model = 'all', confValue = 0, lessThan = FALSE, newOnly = FALSE, mediaType = "photo", manualDetxFilter = "all", limit = Inf, offset = 0) {
   
   if (DBI::dbIsValid(con) == FALSE) stop("The database connection is not valid.")
 
@@ -829,7 +841,21 @@ qryModelOutputsMedia <- function(con, disconnect = FALSE, locationID = 'all', da
       )
     }
   )
-  
+
+  # media.ManualDetx isn't part of the standard schema (some projects add
+  # it as a manual detection-count override), so only filter on it if this
+  # database actually has the column -- and applied here, in SQL, before
+  # `limit` truncates the result set below, not as a post-filter on the
+  # caller's side, which would only ever see whatever `limit` rows already
+  # survived and could silently miss "saved" media that just didn't happen
+  # to fall within the first `limit` rows (ordered by date).
+  if (manualDetxFilter != 'all' && 'ManualDetx' %in% DBI::dbListFields(con, 'media')) {
+    where_clauses <- c(
+      where_clauses,
+      if (manualDetxFilter == 'saved') 'media.ManualDetx IS NOT NULL' else 'media.ManualDetx IS NULL'
+    )
+  }
+
   if (length(where_clauses) != 0) {
     stmnt <- paste(stmnt, 'AND', paste(where_clauses, collapse = ' AND '))
   }

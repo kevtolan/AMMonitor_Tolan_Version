@@ -5,19 +5,20 @@
 \title{Filter a list of media with model outputs based on many criteria}
 \usage{
 qryModelOutputsMedia(
-  con, 
-  disconnect = FALSE, 
-  locationID = 'all', 
-  dateRange = list(c('1900-01-01', as.character(Sys.Date()))), 
-  visitID = NULL, 
-  taxonID = 'all', 
+  con,
+  disconnect = FALSE,
+  locationID = 'all',
+  dateRange = list(c('1900-01-01', as.character(Sys.Date()))),
+  visitID = NULL,
+  taxonID = 'all',
   excludeAnnoVerified = 'NA',
-  selectedUser = NA, 
-  model = "all", 
-  confValue = 0, 
-  lessThan = FALSE, 
-  newOnly = FALSE, 
+  selectedUser = NA,
+  model = "all",
+  confValue = 0,
+  lessThan = FALSE,
+  newOnly = FALSE,
   mediaType = "photo",
+  manualDetxFilter = "all",
   limit = Inf,
   offset = 0
 )
@@ -59,6 +60,18 @@ Default is "all".}
 \item{mediaType}{Type of media. Options are "photo" (default) or "audio".}
 
 \item{newOnly}{TRUE or FALSE. Default is FALSE.}
+
+\item{manualDetxFilter}{Filter on the \code{media.ManualDetx} column (a
+project-specific customization -- a manual detection-count override some
+AMMonitor projects add to the media table -- not part of the standard
+schema). "all" (default) applies no filter; "saved" restricts to media
+where \code{ManualDetx} has been set (is not NULL); "unsaved" restricts
+to media where it hasn't (is NULL). Applied in SQL, before \code{limit},
+so it isn't silently defeated by \code{limit} truncating the result set
+first -- unlike filtering it in afterward on the caller's side, which
+can only ever see whatever \code{limit} rows already made it through. If
+this database doesn't have the \code{ManualDetx} column at all, this
+filter is ignored (there's nothing to filter on).}
 
 \item{limit}{Maximum number of records to be returned}
 
