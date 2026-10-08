@@ -84,10 +84,38 @@ my_home_server <- function(id) {
             }
             rm(con, envir = .GlobalEnv)
           })
+          # The globals loaded at sign-in live exactly as long as `con` does
+          # (shared across sessions), so they're cleaned up here too, not
+          # when an individual session ends -- see the sign-in block below.
+          rm(
+            list = intersect(
+              c('dictionary', 'librarylistitems', 'medialistitems', 'non_taxa_label_options',
+                'shiny_table', 'taxa_label_options', 'taxon_names', 'ammonitor_signed_in_user'),
+              ls(envir = .GlobalEnv)
+            ),
+            envir = .GlobalEnv
+          )
         }, session = NULL)
       }
 
       user_first_name <- reactiveVal(character())
+      
+      # New session (reload/second tab) while the shared connection is
+      # already open and signed in: restore that sign-in for this session.
+      observeEvent(input$selectedUser, once = TRUE, {
+        if (isS4(isolate(con())) && exists("ammonitor_signed_in_user", envir = .GlobalEnv)) {
+          updateTextInput(session, 'selectedUser', value = ammonitor_signed_in_user)
+          user_first_name(
+            dbGetQuery(
+              isolate(con()),
+              "SELECT first_name FROM people WHERE pk_personid = $1;",
+              params = list(ammonitor_signed_in_user)
+            )[,]
+          )
+          shinyjs::disable(id = 'selectedUser')
+          shinyjs::hide(id = 'connect2db')
+        }
+      })
       
       observeEvent(input$connect2db, {
         #connect to database
@@ -141,12 +169,15 @@ my_home_server <- function(id) {
             
             librarylistitems <<- taxontags
             
-            onStop(function() {
-              rm(
-                list = c('dictionary', 'librarylistitems', 'medialistitems', 'non_taxa_label_options', 'shiny_table', 'taxa_label_options', 'taxon_names'),
-                envir = .GlobalEnv
-              )
-            })
+            # Remembered so a page reload (a new session) while the shared
+            # connection is still open can restore this sign-in instead of
+            # leaving `con` live with no user -- cleanup of everything set
+            # here happens in the app-level onStop() above, not per session:
+            # a per-session onStop() here removed these globals when ANY
+            # tab closed/reloaded while `con` (deliberately) survived,
+            # leaving the next session with a live connection but no
+            # shiny_table, which crashed my_db.R's observer on startup.
+            ammonitor_signed_in_user <<- input$selectedUser
             
           } else {
             dbDisconnect(con())

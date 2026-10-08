@@ -975,6 +975,21 @@ since they share a calling convention:
   repeatedly, no longer disturbs the first tab's connection or ability to
   query the database; before the fix, the same sequence reliably reset
   the shared `con` to `NA`.
+- Follow-up regression fix to the above: after `con` was made to persist
+  across sessions, reloading the page (or relaunching into a stale tab)
+  crashed the whole app on startup with `object 'shiny_table' not found`
+  from `my_db.R`'s observer. The data globals loaded at sign-in
+  (`shiny_table`, `dictionary`, `taxon_names`, ...) were still cleaned up
+  by a per-session `onStop()` inside the sign-in block, so closing or
+  reloading any tab removed them while `con` deliberately survived -- the
+  next session then saw a live `con` (passing `req(con())`) but no
+  `shiny_table`. Fixed by removing that per-session `onStop()` and
+  deleting those globals in the same app-level `onStop(session = NULL)`
+  that closes `con`, so they live and die together. A reload while
+  already signed in now also restores that sign-in for the new session
+  (via a remembered `ammonitor_signed_in_user` global) instead of leaving
+  a live connection with a blank, unlocked login form. Verified live:
+  connect, reload, Database tab -- no error, sign-in restored.
 
 ## Related database schema changes (not in this repo)
 
