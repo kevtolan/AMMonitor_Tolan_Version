@@ -923,6 +923,40 @@ since they share a calling convention:
   recording's ~8 kHz Nyquist limit) showed only the first box before the
   fix and both boxes (the second clipped at the top) after.
 
+### New Audio tool: "Model Verifications + Tagging"
+
+- New fifth tool in Audio Tools (`ui.R`, `server.R`,
+  `modules/media_tools/audio_player.R`) for verifying model detections
+  *and* adding manual annotations for vocalizations the model missed, in
+  one place -- previously Model Verifications could only agree/disagree
+  with existing model outputs, and adding a missed call meant switching to
+  the Tagger (and, since only one tool can be used per session, relaunching
+  the app). It reuses the existing pieces rather than duplicating them:
+  the Model Verifications player/table (`viewer_mode = "modelOutputs"`),
+  plus the Tagger's annotator module (draw a box on the spectrogram, pick a
+  taxon, add) and its table of the signed-in user's own annotations (for
+  selecting/deleting them). Drawn-box state, saving (the existing `Save
+  Labels` button writes verifications *and* annotations together), and the
+  manual-detection count (which auto-increments as annotations are added)
+  all work through the same paths the two separate tools already use.
+- `audio_player_ui()`/`audio_player_server()` gain an `allow_tagging`
+  argument (default `FALSE`, so the existing tools are unchanged): it
+  switches the spectrogram plot to the brush-enabled version the Tagger
+  uses, and clears any unsaved drawn boxes when the recording changes (the
+  modelOutputs branch of the per-recording cache observer didn't, since
+  plain Model Verifications has no drawn boxes).
+- Wiring order in `server.R` matters: the player, annotator, and table
+  modules must be created in that order (as the stock Tagger does), not
+  tables first -- with the tables first, the Tagger-style table's outputs
+  evaluated before the metadata cache existed and logged `$ operator is
+  invalid for atomic vectors` from `file_tags` at load.
+- Verified live against `ammCreateMiniDemo()`: drew a box on an unlabeled
+  call, picked a taxon, added it (a "Not Saved" box appeared, the Taxon
+  Tags table listed it, and the manual-detection count went 22 -> 23),
+  agreed with a model detection, pressed Save Labels, and confirmed the
+  new `annotations` row and `modelverifications` row in the database.
+  Then trialled by the project owner against their own workflow.
+
 ### `modules/my_home.R`
 
 - Fixed `"Closing Database Connections"` printing once per browser

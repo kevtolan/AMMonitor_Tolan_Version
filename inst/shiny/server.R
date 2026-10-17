@@ -128,6 +128,12 @@ server <- function(input, output, session) {
     shinyjs::addClass(selector = "body", class = "sidebar-collapse")
   })
   
+  observeEvent(input$audio_model_verifier_tagger, {
+    updateTabsetPanel(session, 'audio_tabs', selected = 'Model Verifications + Tagging')
+    disableMenuItems()
+    shinyjs::addClass(selector = "body", class = "sidebar-collapse")
+  })
+  
   # Photos tab, viewer
   photo_viewer_loaded <- reactiveVal(FALSE)
   observe({
@@ -400,6 +406,68 @@ server <- function(input, output, session) {
       viewer_mode = "modelOutputs",
       selected_rows = reactive(audio_modelOutput_tables_output$selected_annotation_rows()),
       verifications_cache = reactive(audio_modelOutput_tables_output$verifications_cache())
+    )
+  })
+
+  # Audio tab, model verifier + tagger: verify model detections AND add
+  # annotations for vocalizations the model missed, in one tool. Same
+  # lazy-load guard as the Model Verifications block above (and for the same
+  # reason).
+  audio_mvt_loaded <- reactiveVal(FALSE)
+  observe({
+    req(con())
+    req(isolate(audio_mvt_loaded()) == FALSE)
+    req(input$tabs == "Audio" && input$audio_tabs == "Model Verifications + Tagging")
+    audio_mvt_loaded(TRUE)
+
+    mvt_active <- reactive(input$tabs == "Audio" && input$audio_tabs == "Model Verifications + Tagging")
+
+    audio_mvt_player_output <- audio_player_server(
+      id = "audio_mvt_player",
+      selectedUser = reactive(my_home_outputs$selectedUser()),
+      active = mvt_active,
+      updateTags = reactive(audio_annotator_mvt_output$annoUpdate()),
+      viewer_mode = "modelOutputs",
+      allow_tagging = TRUE,
+      annotations_cache = reactive(audio_annotator_mvt_output$annotations_cache()),
+      selected_rows = reactive(mvt_model_tables_output$selected_annotation_rows()),
+      deleted_rows = reactive(mvt_tag_tables_output$deleted_annotation_rows()),
+      verifications_cache = reactive(mvt_model_tables_output$verifications_cache())
+    )
+
+    audio_annotator_mvt_output <- audio_annotator_server(
+      id = 'audio_annotator_mvt',
+      selectedUser = reactive(my_home_outputs$selectedUser()),
+      audio_name = reactive(audio_mvt_player_output$audio_name()),
+      last_audio_name = reactive(audio_mvt_player_output$last_audio_name()),
+      the_bboxes = reactive(audio_mvt_player_output$bboxes()),
+      metadata_cache = reactive(audio_mvt_player_output$metadata_cache()),
+      active = mvt_active
+    )
+
+    mvt_model_tables_output <- annotation_viewer_tables_server(
+      id = "mvt_model_tables",
+      selectedUser = reactive(my_home_outputs$selectedUser()),
+      active = mvt_active,
+      file_name = reactive(audio_mvt_player_output$audio_name()),
+      viewer_mode = 'modelOutputs',
+      metadata_cache = reactive(audio_mvt_player_output$metadata_cache()),
+      mediaType = "audio",
+      confValue = reactive(audio_mvt_player_output$modelConf()),
+      lessThan = reactive(audio_mvt_player_output$modelLessThan())
+    )
+
+    # The user's own annotations on this recording (including newly added
+    # ones), for selecting/deleting them.
+    mvt_tag_tables_output <- annotation_viewer_tables_server(
+      id = "mvt_tag_tables",
+      selectedUser = reactive(my_home_outputs$selectedUser()),
+      active = mvt_active,
+      file_name = reactive(audio_mvt_player_output$audio_name()),
+      updateTags = reactive(audio_annotator_mvt_output$annoUpdate()),
+      viewer_mode = "tagger",
+      metadata_cache = reactive(audio_mvt_player_output$metadata_cache()),
+      mediaType = "audio"
     )
   })
 } # end of server function

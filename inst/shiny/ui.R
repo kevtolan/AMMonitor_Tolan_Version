@@ -135,7 +135,8 @@ ui <- dashboardPage(
                 column(width = 3, actionButton('audio_player', 'Player')),
                 column(width = 3, actionButton('audio_tagger', 'Tagger')),
                 column(width = 3, actionButton('audio_anno_verifier', 'Annotation Verifications')),
-                column(width = 3, actionButton('audio_model_verifier', 'Model Verifications'))
+                column(width = 3, actionButton('audio_model_verifier', 'Model Verifications')),
+                column(width = 3, actionButton('audio_model_verifier_tagger', 'Model Verifications + Tagging'))
               )
             ),
             audio_tools_about_ui("audio_tools_about")
@@ -176,6 +177,23 @@ ui <- dashboardPage(
             audio_player_ui('audio_modelOutput_player', viewer_mode = "modelOutputs"),
             annotation_viewer_tables_ui('modelOutput_viewer_tables_audio', viewer_mode = "modelOutputs"),
             audio_comment_box_ui('audio_modelOutput_player')
+          ),
+          tabItem(
+            title = 'Model Verifications + Tagging',
+            tabName = 'Model Verifications + Tagging',
+            fluidRow(
+              column(
+                width = 1,
+                audio_annotator_ui("audio_annotator_mvt")
+              ),
+              column(
+                width = 11,
+                audio_player_ui('audio_mvt_player', viewer_mode = "modelOutputs", allow_tagging = TRUE)
+              )
+            ),
+            annotation_viewer_tables_ui('mvt_model_tables', viewer_mode = "modelOutputs"),
+            annotation_viewer_tables_ui('mvt_tag_tables', viewer_mode = "tagger", mediaType = "audio"),
+            audio_comment_box_ui('audio_mvt_player')
           )
         )
       )

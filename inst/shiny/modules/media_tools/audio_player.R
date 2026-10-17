@@ -1,4 +1,4 @@
-audio_player_ui <- function(id, viewer_mode) {
+audio_player_ui <- function(id, viewer_mode, allow_tagging = FALSE) {
   ns <- NS(id)
   tagList(
     shinyjs::useShinyjs(),
@@ -51,7 +51,7 @@ audio_player_ui <- function(id, viewer_mode) {
               "viewer" = tags$h2('Audio Player'),
               "tagger" = tags$h2('Audio Tagger'),
               "verifier" = tags$h2('Annotation Verifier'),
-              "modelOutputs" = tags$h2('Model Verifier')
+              "modelOutputs" = tags$h2(if (allow_tagging) 'Model Verifier + Tagger' else 'Model Verifier')
             )
           ),
           column(
@@ -382,7 +382,7 @@ audio_player_ui <- function(id, viewer_mode) {
                 width = "100%",
                 height = "350px"
               ), # the line
-              {if (viewer_mode == 'tagger') {
+              {if (viewer_mode == 'tagger' || allow_tagging) {
                 plotOutput(
                   ns("plotx"),
                   width = "100%",
@@ -525,7 +525,7 @@ audio_comment_box_ui <- function(id) {
   )
 }
 
-audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), updateTags = reactive(NA), viewer_mode, annotations_cache = reactive(NA), verifications_cache = reactive(NA), selected_rows = reactive(NA), deleted_rows = reactive(NA)) {
+audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), updateTags = reactive(NA), viewer_mode, annotations_cache = reactive(NA), verifications_cache = reactive(NA), selected_rows = reactive(NA), deleted_rows = reactive(NA), allow_tagging = FALSE) {
   moduleServer(id, function(input, output, session) {
     # Temp directory for filtered audios
     td <- tempdir(check = TRUE)
@@ -1554,6 +1554,11 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
       # Remove all pending bounding boxes
       # Subset of annotations with matching mediaID
       if (viewer_mode == 'modelOutputs') {
+        # Model Verifier + Tagger: boxes drawn for a missed call belong to
+        # the recording they were drawn on, so drop any unsaved ones now
+        # that the recording has changed (the non-modelOutputs branch below
+        # does the same for plain Tagger).
+        if (allow_tagging) the_bboxes(the_bboxes()[0,])
         if (!is.na(input$modelConf)) {
           if (input$modelLessThan == TRUE) {
             scores_conditions_mask <- metadata_cache$cache$modeloutputs$value_num <= input$modelConf
