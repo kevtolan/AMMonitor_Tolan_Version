@@ -957,6 +957,21 @@ since they share a calling convention:
   new `annotations` row and `modelverifications` row in the database.
   Then trialled by the project owner against their own workflow.
 
+- Fixed a session-killing `Error in [.data.frame: undefined columns
+  selected` from `audio_player.R`'s autosave observer, reachable in any
+  audio tool whenever the recording list is empty (e.g. Apply Filters
+  matches nothing, or before the first Apply) and an annotation,
+  verification, or deletion event then fires -- far easier to hit in
+  "Model Verifications + Tagging", where the annotator's events fire in
+  that state. The cache-loading observer's zero-recordings branch built
+  its placeholder `annotations`, `annotags`, `modeloutputs`, and
+  `mediatags` tables without the `0 AS is_add, 0 AS is_delete` columns
+  that the populated-cache queries add, and the autosave observer indexes
+  `cache$<table>[, c('is_add', 'is_delete')]` on every table. Added the
+  columns to the placeholders. Reproduced against the old code (empty
+  filter result, then the add-annotation button) and confirmed gone with
+  the fix.
+
 ### `modules/my_home.R`
 
 - Fixed `"Closing Database Connections"` printing once per browser

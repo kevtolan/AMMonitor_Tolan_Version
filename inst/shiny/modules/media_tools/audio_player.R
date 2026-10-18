@@ -965,12 +965,18 @@ audio_player_server <- function(id, selectedUser = NA, active = reactive(TRUE), 
       i_cache_start <- max(1, effective_cache_size()*(i_cache()-1))
       i_cache_end <- min(effective_cache_size()*i_cache(), nrow(audio_avail()))
       if (nrow(audio_avail()) == 0) {
+        # Zero recordings (e.g. Apply Filters matched nothing). These
+        # placeholders still need the is_add/is_delete columns the
+        # populated-cache queries below add: the autosave observer indexes
+        # `cache$<table>[, c('is_add', 'is_delete')]` on every table
+        # whenever annotations/verifications/deleted rows change, and
+        # without them that throws "undefined columns selected" and takes
+        # the session down.
         cache_media <- integer(0)
-        cache_annotations <- DBI::dbGetQuery(con(), 'SELECT * FROM annotations WHERE fk_mediaID = -99;')
-        cache_annotags <- dbGetQuery(con(), 'SELECT annotags.*, fk_librarylistid, item FROM annotags INNER JOIN librarylistitems ON annotags.fk_librarylistitemid = librarylistitems.pk_librarylistitemid WHERE fk_annotationid = -99;')
-        cache_annotags <- dbGetQuery(con(), 'SELECT annotags.*, fk_librarylistid, item FROM annotags INNER JOIN librarylistitems ON annotags.fk_librarylistitemid = librarylistitems.pk_librarylistitemid WHERE fk_annotationid = -99;')
-        cache_modeloutputs <- dbGetQuery(con(), 'SELECT model_name, pk_modeloutputid, fk_librarylistitemid, fk_mediaid, fk_medialistitemid, x_min, x_max, y_min, y_max, modeloutputs.fk_taxonid, value_num FROM modeloutputs INNER JOIN models ON modeloutputs.fk_modelid = models.pk_modelid WHERE fk_mediaid = -99;')
-        cache_mediatags <- dbGetQuery(con(), 'SELECT pk_mediatagid, fk_mediaid, fk_personid, fk_medialistid, item, value_num FROM mediatags INNER JOIN medialistitems ON mediatags.fk_medialistitemid = medialistitems.pk_medialistitemid WHERE pk_mediatagid = -99;')
+        cache_annotations <- DBI::dbGetQuery(con(), 'SELECT *, 0 AS is_add, 0 AS is_delete FROM annotations WHERE fk_mediaID = -99;')
+        cache_annotags <- dbGetQuery(con(), 'SELECT annotags.*, fk_librarylistid, item, 0 AS is_add, 0 AS is_delete FROM annotags INNER JOIN librarylistitems ON annotags.fk_librarylistitemid = librarylistitems.pk_librarylistitemid WHERE fk_annotationid = -99;')
+        cache_modeloutputs <- dbGetQuery(con(), 'SELECT model_name, pk_modeloutputid, fk_librarylistitemid, fk_mediaid, fk_medialistitemid, x_min, x_max, y_min, y_max, modeloutputs.fk_taxonid, value_num, 0 AS is_add, 0 AS is_delete FROM modeloutputs INNER JOIN models ON modeloutputs.fk_modelid = models.pk_modelid WHERE fk_mediaid = -99;')
+        cache_mediatags <- dbGetQuery(con(), 'SELECT pk_mediatagid, fk_mediaid, fk_personid, fk_medialistid, item, value_num, 0 AS is_add, 0 AS is_delete FROM mediatags INNER JOIN medialistitems ON mediatags.fk_medialistitemid = medialistitems.pk_medialistitemid WHERE pk_mediatagid = -99;')
       } else {
         cache_media <- audio_avail()$pk_mediaid[i_cache_start:i_cache_end]
         # input$filterTaxa is a plain scalar ("all" or one taxon id) in
