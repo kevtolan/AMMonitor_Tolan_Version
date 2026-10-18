@@ -30,7 +30,13 @@ annotation_viewer_tables_ui <- function(id, viewer_mode, mediaType = "photo") {
     # table. A plain click still toggles a single row via reactable's own
     # onClick handler; only an actual drag (mousedown then mouseover a
     # different row before mouseup) triggers this, which computes the full
-    # row range and applies it via updateReactable() server-side.
+    # row range and applies it via updateReactable() server-side. The rows
+    # the user dragged over are the *displayed* ones (after any sorting or
+    # time-range filtering), so each is mapped back to its position in the
+    # underlying data by its unique pk_modeloutputid -- updateReactable()'s
+    # `selected` indexes the data, not what's on screen, and a plain
+    # page * pageSize + position count is only right for an unsorted,
+    # unfiltered table.
     if (viewer_mode == "modelOutputs") {
       tags$script(HTML(paste0(
         "(function() {",
@@ -53,10 +59,17 @@ annotation_viewer_tables_ui <- function(id, viewer_mode, mediaType = "photo") {
         "    var hi = Math.max(startIdx, idx);",
         "    if (hi > lo) {",
         "      var state = window.Reactable ? Reactable.getState(tableId) : null;",
-        "      var page = (state && state.page) || 0;",
-        "      var pageSize = (state && state.pageSize) || 10;",
+        "      if (!state || !state.pageRows || !state.data) return;",
         "      var indices = [];",
-        "      for (var i = lo; i <= hi; i++) { indices.push(page * pageSize + i + 1); }",
+        "      for (var i = lo; i <= hi; i++) {",
+        "        var shown = state.pageRows[i];",
+        "        if (!shown) continue;",
+        "        var orig = -1;",
+        "        for (var k = 0; k < state.data.length; k++) {",
+        "          if (state.data[k].pk_modeloutputid === shown.pk_modeloutputid) { orig = k; break; }",
+        "        }",
+        "        if (orig >= 0) indices.push(orig + 1);",
+        "      }",
         "      Shiny.setInputValue('", ns('drag_selected_rows'), "', indices);",
         "    }",
         "  });",
@@ -345,7 +358,11 @@ annotation_viewer_tables_server <- function(id, selectedUser = reactive(NA), act
           columns = list(
             pk_modeloutputid = colDef(name = "ID"),
             model_name = colDef(style = list(whiteSpace = "nowrap", overflow = "hidden", textOverflow = "ellipsis")),
-            value_num = colDef(format = colFormat(digits = 2))
+            # Only the model score is sortable (the table is otherwise
+            # unsortable); highest first on the first click. Selection
+            # state is indexed against the underlying data, not display
+            # order, so sorting doesn't disturb which rows are selected.
+            value_num = colDef(format = colFormat(digits = 2), sortable = TRUE, defaultSortOrder = "desc")
           ),
           sortable = FALSE,
           selection = "multiple",
@@ -372,7 +389,11 @@ annotation_viewer_tables_server <- function(id, selectedUser = reactive(NA), act
           columns = list(
             pk_modeloutputid = colDef(name = "ID"),
             model_name = colDef(style = list(whiteSpace = "nowrap", overflow = "hidden", textOverflow = "ellipsis")),
+            # Sortable too (earliest first), as the way back to
+            # chronological order after sorting by value_num.
             `Start time (s)` = colDef(
+              sortable = TRUE,
+              defaultSortOrder = "asc",
               filterable = TRUE,
               format = colFormat(digits = 2),
               filterMethod = JS(
@@ -426,7 +447,8 @@ annotation_viewer_tables_server <- function(id, selectedUser = reactive(NA), act
             ),
             `Min freq (KHz)` = colDef(format = colFormat(digits = 2)),
             `Max freq (KHz)` = colDef(format = colFormat(digits = 2)),
-            value_num = colDef(format = colFormat(digits = 2))
+            # Only the model score is sortable; see the photo table above.
+            value_num = colDef(format = colFormat(digits = 2), sortable = TRUE, defaultSortOrder = "desc")
           ),
           sortable = FALSE,
           defaultExpanded = TRUE,

@@ -616,6 +616,35 @@ since they share a calling convention:
 
 ### `modules/media_tools/annotation_viewer_tables.R`
 
+- The model-output tables (Model Verifications, audio and photo) can now be
+  sorted by the `value_num` score: click the column header (highest first
+  on the first click, lowest first on the second). Only that column is
+  sortable -- the tables were otherwise deliberately unsortable
+  (`sortable = FALSE`), so this is a per-column override rather than
+  turning sorting on everywhere. reactable's `selected` state is indexed
+  against the underlying data, not the displayed order, so row selection,
+  Agree/Disagree, and jump-to-selection keep acting on the row you see.
+  Verified live: sorted ascending, selected the top displayed row (ID 55,
+  score 0.11), Agree + Save Labels, and the saved `modelverifications` row
+  pointed at `modeloutputs` 55 (score 0.1145). In the audio table,
+  `Start time (s)` is sortable too (earliest first), as the way back to
+  chronological order after sorting by score; checked that sorting by score
+  scrambles the start times and clicking `Start time (s)` restores them in
+  ascending order.
+- Fixed click-and-drag row selection on the model-output table selecting the
+  wrong rows once the table is sorted (or time-range filtered). The drag
+  JS turned the rows it passed over into data indices as `page * pageSize
+  + displayed position + 1`, which is only right when the table is in its
+  original order; `updateReactable(selected = )` indexes the underlying
+  data, not what's on screen. After sorting by score, dragging across the
+  top three displayed rows (IDs 2, 4, 3) selected IDs 43, 1, 5 -- the
+  first three in the original order -- so Agree/Disagree would have been
+  applied to the wrong detections. Each dragged row is now mapped back to
+  its data index by its unique `pk_modeloutputid` via
+  `Reactable.getState()`'s `pageRows` and `data`. Verified with the same
+  drag in sorted, sorted+filtered, and original order: the selected IDs
+  always match the rows displayed.
+
 - "Taxon Model Outputs" table: `model_name` column no longer wraps;
   multi-select enabled for audio (was single-select), with a slightly
   darker highlight on selected rows; click-and-drag range selection across
