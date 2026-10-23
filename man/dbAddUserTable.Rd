@@ -232,6 +232,7 @@ unlink(demo_fp, recursive = TRUE)
 
 Other database: 
 \code{\link{addRecord}()},
+\code{\link{dbAddIndexes}()},
 \code{\link{dbAddUserCol}()},
 \code{\link{dbCheckCore}()},
 \code{\link{dbCheckData}()},

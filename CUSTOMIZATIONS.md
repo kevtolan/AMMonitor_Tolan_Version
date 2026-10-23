@@ -249,6 +249,35 @@ since they share a calling convention:
   title the plots didn't say what those lines' vertical position actually
   represented.
 
+## New package functions -- database
+
+- **`dbAddIndexes(con, dry_run = FALSE)`** (`R/dbAddIndexes.R`) -- creates
+  an index on every foreign-key column that isn't already covered by one.
+  SQLite doesn't index foreign keys automatically and the package creates
+  no indexes at all, so any lookup of rows that reference a parent row --
+  which is what SQLite does on every delete, to cascade or to enforce
+  RESTRICT -- scans the whole child table. On `VPMon_AMM.sqlite`
+  (`modeloutputs` ~27M rows) deleting model outputs cost about 2.2 s *per
+  row* (extrapolated ~405 hours for the 661,269 outputs of one site-year),
+  almost all of it from the unindexed self-referencing
+  `modeloutputs.fk_parentid` (ON DELETE RESTRICT). Foreign keys are read
+  from `PRAGMA foreign_key_list` rather than a hand-kept list, so it
+  covers tables and keys a project adds itself; a key counts as already
+  indexed if any existing index (including a primary key or unique
+  constraint) starts with the same columns, so it's safe to re-run.
+  `dry_run = TRUE` lists what it would create without touching anything.
+  Deliberately a function you call, not something run on connect: building
+  the indexes writes to the database and takes time.
+  Measured on a copy of the production database: 66 indexes created in
+  ~59 s (the six big `modeloutputs` ones ~6-8 s each), a second run does
+  nothing (0.1 s), and the same 661,269-output delete then takes 2.8 s with
+  foreign keys on and no foreign-key violations afterward. **The cost:** the
+  file grew from 2.4 GB to 4.5 GB, and indexes slow bulk inserts slightly
+  (e.g. `scoresDetect()` writing results; not measured). Not yet done:
+  `dbCreate()` still doesn't create indexes for new databases, and the
+  effect on the Shiny app's per-recording `fk_mediaid` queries hasn't been
+  timed.
+
 ## Bug fixes to existing package functions
 
 - **`inst/shiny/modules/app_modules/registerVisitUpdateDB.R`** -- adding

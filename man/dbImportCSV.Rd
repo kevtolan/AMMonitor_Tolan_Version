@@ -74,6 +74,7 @@ unlink(csv_path)
 \seealso{
 Other database: 
 \code{\link{addRecord}()},
+\code{\link{dbAddIndexes}()},
 \code{\link{dbAddUserCol}()},
 \code{\link{dbAddUserTable}()},
 \code{\link{dbCheckCore}()},

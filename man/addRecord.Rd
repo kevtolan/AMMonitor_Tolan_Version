@@ -123,6 +123,7 @@ unlink(demo_fp, recursive = TRUE)
 }
 \seealso{
 Other database: 
+\code{\link{dbAddIndexes}()},
 \code{\link{dbAddUserCol}()},
 \code{\link{dbAddUserTable}()},
 \code{\link{dbCheckCore}()},

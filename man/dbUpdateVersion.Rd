@@ -92,6 +92,7 @@ unlink(db_path_updated)
 \seealso{
 Other database: 
 \code{\link{addRecord}()},
+\code{\link{dbAddIndexes}()},
 \code{\link{dbAddUserCol}()},
 \code{\link{dbAddUserTable}()},
 \code{\link{dbCheckCore}()},
